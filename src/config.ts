@@ -1,0 +1,30 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const config = {
+  PORT: parseInt(process.env.PORT || '4000'),
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  APP_URL: process.env.APP_URL || 'http://localhost:4000',
+  DB_HOST: process.env.DB_HOST || '127.0.0.1',
+  DB_PORT: parseInt(process.env.DB_PORT || '5432'),
+  DB_NAME: process.env.DB_NAME || 'seedexchange',
+  DB_USER: process.env.DB_USER || 'seedexchange',
+  DB_PASSWORD: process.env.DB_PASSWORD || '',
+  SESSION_SECRET: process.env.SESSION_SECRET || 'change-me',
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+  CONNECT_ENABLED: process.env.CONNECT_ENABLED === '1',
+  MARKETPLACE_PAYMENTS_ENABLED: process.env.MARKETPLACE_PAYMENTS_ENABLED === '1',
+  PAYOUT_WORKER_ENABLED: process.env.PAYOUT_WORKER_ENABLED === '1',
+  MAIL_HOST: process.env.MAIL_HOST || '',
+  MAIL_PORT: parseInt(process.env.MAIL_PORT || '587'),
+  MAIL_ENCRYPTION: process.env.MAIL_ENCRYPTION || 'tls',
+  MAIL_USER: process.env.MAIL_USER || '',
+  MAIL_PASS: process.env.MAIL_PASS || '',
+  MAIL_FROM: process.env.MAIL_FROM || '',
+  MAIL_FROM_NAME: process.env.MAIL_FROM_NAME || 'Seedexchange',
+  MAIL_REPLY_TO: process.env.MAIL_REPLY_TO || '',
+  GOOGLE_SITE_VERIFICATION: process.env.GOOGLE_SITE_VERIFICATION || '',
+  ORESHKA_FEED_URL: process.env.ORESHKA_FEED_URL || '',
+  ORESHKA_FEED_TOKEN: process.env.ORESHKA_FEED_TOKEN || '',
+};

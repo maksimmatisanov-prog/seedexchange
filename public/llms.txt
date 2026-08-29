@@ -1,0 +1,13 @@
+# Seedexchange
+
+> A public directory, non-commercial exchange and multi-vendor marketplace for documented seed collections.
+
+## Public sections
+
+- [Home](https://seedexchange.online/)
+- [Organization directory](https://seedexchange.online/directory/)
+- [Seed marketplace](https://seedexchange.online/marketplace/)
+- [Exchange and donations](https://seedexchange.online/exchange/)
+- [About](https://seedexchange.online/about/)
+- [Platform terms](https://seedexchange.online/terms/)
+- [Privacy](https://seedexchange.online/privacy/)

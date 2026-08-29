@@ -1,0 +1,197 @@
+/* Seedexchange — Botanical Archive Design System */
+/* Tokens */
+:root {
+  --ink: #18352a;
+  --forest: #173d2d;
+  --forest-deep: #0d2c20;
+  --canvas: #f3f0e6;
+  --paper: #fbf8ef;
+  --surface: #fffdf7;
+  --leaf: #316b4d;
+  --leaf-dark: #21543b;
+  --sun: #a8742a;
+  --muted: #647168;
+  --line: #d7d9cc;
+  --on-accent: #fffdf7;
+  --on-dark: #f4efe2;
+  --danger: #9f352e;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Manrope', 'Avenir Next', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --container: min(1240px, calc(100% - 48px));
+  --reading: 65ch;
+}
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--canvas);
+  line-height: 1.6;
+}
+img { max-width: 100%; height: auto; display: block; }
+a { color: var(--leaf); }
+a:visited { color: var(--forest); }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
+
+/* Skip link */
+.skip-link {
+  position: absolute; left: -9999px; top: auto;
+  padding: 8px 16px; background: var(--forest); color: var(--on-dark);
+  z-index: 1000; font-size: 14px;
+}
+.skip-link:focus { left: 16px; top: 16px; }
+
+/* Header */
+.site-header {
+  background: var(--forest);
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.nav {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: var(--container); margin: 0 auto;
+  padding: 12px 24px; gap: 24px;
+}
+.nav-brand {
+  font-family: var(--font-display); font-size: 1.25rem;
+  color: var(--on-dark); text-decoration: none; font-weight: 700;
+}
+.nav-brand:visited { color: var(--on-dark); }
+.nav-links {
+  display: flex; list-style: none; gap: 24px;
+}
+.nav-links a {
+  color: var(--on-dark); text-decoration: none; font-size: 0.9rem;
+  opacity: 0.85; transition: opacity 0.2s;
+}
+.nav-links a:hover, .nav-links a[aria-current="page"] { opacity: 1; }
+.nav-actions { display: flex; align-items: center; gap: 12px; }
+.nav-cart { color: var(--on-dark); text-decoration: none; font-size: 0.9rem; }
+
+/* Buttons */
+.button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 12px 24px; border-radius: 10px; font-weight: 600;
+  text-decoration: none; font-size: 0.95rem;
+  background: var(--leaf); color: var(--on-accent);
+  border: none; cursor: pointer; transition: background 0.2s;
+  min-height: 44px;
+}
+.button:hover { background: var(--leaf-dark); }
+.button:visited { color: var(--on-accent); }
+.button-secondary {
+  background: transparent; color: var(--on-dark);
+  border: 1px solid rgba(255,255,255,0.3);
+}
+.button-secondary:hover { background: rgba(255,255,255,0.1); }
+.button-small { padding: 8px 16px; font-size: 0.85rem; min-height: 36px; }
+
+/* Layout */
+.section {
+  max-width: var(--container); margin: 0 auto;
+  padding: 72px 24px;
+}
+
+/* Hero */
+.home-hero {
+  background: var(--forest); color: var(--on-dark);
+  padding: 96px 24px 80px;
+  text-align: center;
+}
+.hero-copy { max-width: 700px; margin: 0 auto; }
+.hero-copy h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  margin: 16px 0 24px; color: var(--on-dark);
+}
+.hero-copy p { font-size: 1.1rem; opacity: 0.9; margin-bottom: 32px; }
+
+/* Eyebrow */
+.eyebrow {
+  font-family: var(--font-mono); font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); margin-bottom: 8px;
+}
+
+/* Archive paths */
+.archive-paths { background: var(--paper); }
+.editorial-heading { margin-bottom: 40px; }
+.editorial-heading h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+.archive-list { display: flex; flex-direction: column; gap: 0; }
+.archive-row {
+  display: flex; align-items: center; gap: 24px;
+  padding: 24px 0; border-bottom: 1px solid var(--line);
+  text-decoration: none; color: var(--ink);
+  transition: background 0.2s;
+}
+.archive-row:hover { background: rgba(0,0,0,0.02); }
+.archive-number {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  color: var(--sun); min-width: 32px;
+}
+.archive-row strong { display: block; margin-bottom: 4px; }
+.archive-row small { color: var(--muted); font-size: 0.9rem; }
+.archive-link {
+  margin-left: auto; color: var(--leaf); font-weight: 600;
+  font-size: 0.9rem; white-space: nowrap;
+}
+
+/* Metrics */
+.archive-metrics {
+  display: flex; justify-content: center; gap: 48px;
+  padding: 48px 24px; background: var(--surface);
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.archive-metrics div { text-align: center; }
+.archive-metrics strong {
+  display: block; font-family: var(--font-display);
+  font-size: 2rem; color: var(--forest);
+}
+.archive-metrics span { font-size: 0.85rem; color: var(--muted); }
+
+/* Founder callout */
+.founder-callout {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 40px; flex-wrap: wrap;
+}
+.founder-callout h2 { font-size: clamp(1.3rem, 3vw, 1.8rem); margin: 8px 0 16px; }
+.founder-callout p { max-width: 600px; color: var(--muted); }
+
+/* Page intro */
+.page-intro {
+  background: var(--forest); color: var(--on-dark);
+  padding: 72px 24px; text-align: center;
+}
+.page-intro h1 {
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  max-width: 800px; margin: 0 auto 16px; color: var(--on-dark);
+}
+.page-intro p {
+  max-width: 600px; margin: 0 auto; opacity: 0.9; font-size: 1.05rem;
+}
+
+/* Footer */
+.site-footer {
+  background: var(--forest-deep); color: var(--on-dark);
+  padding: 48px 24px; text-align: center;
+}
+.footer-content { max-width: var(--container); margin: 0 auto; }
+.footer-links {
+  display: flex; justify-content: center; gap: 24px;
+  list-style: none; margin: 16px 0;
+}
+.footer-links a { color: var(--on-dark); opacity: 0.8; text-decoration: none; }
+.footer-links a:hover { opacity: 1; }
+.footer-compliance { font-size: 0.8rem; opacity: 0.6; margin-top: 16px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .archive-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .archive-link { margin-left: 0; }
+  .archive-metrics { flex-direction: column; gap: 24px; }
+  .founder-callout { flex-direction: column; text-align: center; }
+  .section { padding: 48px 16px; }
+}
