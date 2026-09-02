@@ -42,6 +42,8 @@ All operational package commands now compile and exist. Payment flags remain off
 - `npm run build`: passed as a clean build with compiled operational commands and copied SQL migrations.
 - Vitest: 10 normal local tests passed; the database integration test is skipped when `TEST_DATABASE_URL` is absent.
 - Isolated local PostgreSQL 14: both migrations applied on an empty database and the repeated run applied zero files.
+- Playwright: 33/33 public route, broken-link and serious/critical WCAG checks passed in Chromium at 375, 768 and 1440 px.
+- Clean clone: `npm ci`, TypeScript, clean build and Vitest passed without reusing `node_modules` or `dist`.
 - `npm audit --json`: 0 known vulnerabilities at the recorded check.
 - Local built runtime on port 4057: `/health`, `/`, `/about`, `/assets/app.css` and `/robots.txt` returned 200; an unknown route returned 404. The temporary server was stopped after the check.
 - Live read-only HTTP audit: `/`, `/directory/`, `/marketplace/`, `/exchange/`, `/robots.txt` and `/sitemap.xml` returned 200. The live response identified `PHP/8.3.33`; `/health` returned 404. This confirms production is still the PHP application, not this Node target.
