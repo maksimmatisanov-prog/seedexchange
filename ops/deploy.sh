@@ -31,7 +31,7 @@ previous=''
 if [[ -L "$root/current" ]]; then previous=$(readlink -f "$root/current"); fi
 ln -sfn "$release" "$root/current.next"
 mv -Tf "$root/current.next" "$root/current"
-if ! sudo systemctl restart seedexchange-staging.service || ! curl -fsS http://127.0.0.1:4100/ready; then
+if ! sudo systemctl restart seedexchange-staging.service || ! curl --fail --silent --show-error --retry 10 --retry-delay 1 --retry-connrefused --max-time 5 http://127.0.0.1:4100/ready; then
   if [[ -n "$previous" && "$previous" == "$root"/releases/* ]]; then
     ln -sfn "$previous" "$root/current.next"
     mv -Tf "$root/current.next" "$root/current"
