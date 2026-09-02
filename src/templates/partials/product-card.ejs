@@ -1,0 +1,11 @@
+<article class="product-card">
+  <a class="product-image" href="/product/<%= product.slug %>">
+    <img src="<%= product.image_url || '/assets/seed-placeholder.svg' %>" alt="<%= product.name %>" width="640" height="480" loading="lazy">
+  </a>
+  <div class="product-card-body">
+    <p class="product-source"><a href="/directory/<%= product.organization_slug %>"><%= product.organization_name %></a></p>
+    <h3><a href="/product/<%= product.slug %>"><%= product.name %></a></h3>
+    <% if (product.botanical_name) { %><p class="botanical-name"><em><%= product.botanical_name %></em></p><% } %>
+    <div class="product-card-meta"><strong><%= new Intl.NumberFormat('en-US',{style:'currency',currency:product.currency}).format(Number(product.price_cents)/100) %></strong><span><%= Number(product.stock_quantity) > 0 ? 'Available' : 'Unavailable' %></span></div>
+  </div>
+</article>

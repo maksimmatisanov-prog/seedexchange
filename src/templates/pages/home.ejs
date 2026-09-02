@@ -1,10 +1,11 @@
-<section class="home-hero">
+<section class="home-hero" aria-labelledby="home-title">
   <div class="hero-copy">
     <p class="eyebrow">The living seed archive</p>
-    <h1 id="home-title">Seeds are stories worth keeping alive.</h1>
-    <p>Find documented seeds, trusted collections and the people preserving plant diversity across borders.</p>
-    <a class="button" href="/marketplace">Explore the marketplace</a>
+    <h1 id="home-title"><%= title %></h1>
+    <p><%= description %></p>
+    <div class="hero-actions"><a class="button button-light" href="/marketplace">Explore the marketplace</a><a href="/directory">Meet the custodians</a></div>
   </div>
+  <picture class="hero-visual"><source srcset="/assets/hero-botanical-archive-v3.webp" type="image/webp"><img src="/assets/hero-botanical-archive-v3.png" alt="Botanical archive trays with carefully documented seed packets" width="1200" height="900" fetchpriority="high"></picture>
 </section>
 
 <section class="section archive-paths">
@@ -14,22 +15,23 @@
   </header>
   <div class="archive-list">
     <a class="archive-row" href="/directory">
-      <span class="archive-number">01</span>
       <span><strong>Find custodians</strong><small>Browse approved seed banks, botanic gardens, nurseries and collectors.</small></span>
       <span class="archive-link">Open directory</span>
     </a>
     <a class="archive-row" href="/exchange">
-      <span class="archive-number">02</span>
       <span><strong>Exchange responsibly</strong><small>Contact collection owners directly about no-money exchanges and donations.</small></span>
       <span class="archive-link">View exchange</span>
     </a>
     <a class="archive-row" href="/marketplace">
-      <span class="archive-number">03</span>
       <span><strong>Order from growers</strong><small>Buy available seeds from approved sellers with seller-specific shipping and protected checkout.</small></span>
       <span class="archive-link">Visit marketplace</span>
     </a>
   </div>
 </section>
+
+<% if (products.length) { %><section class="section"><header class="editorial-heading"><h2>Recently documented accessions</h2></header><div class="product-grid"><% products.forEach(function(product){ %><%- include('../partials/product-card', { product: product }) %><% }) %></div></section><% } %>
+
+<% if (organizations.length) { %><section class="section paper-section"><header class="editorial-heading"><h2>Collections behind the seeds</h2></header><div class="organization-grid"><% organizations.forEach(function(organization){ %><a class="organization-card" href="/directory/<%= organization.slug %>"><span><%= organization.type.replaceAll('_',' ') %> in <%= organization.country %></span><h3><%= organization.name %></h3><p><%= organization.description %></p></a><% }) %></div></section><% } %>
 
 <section class="archive-metrics" aria-label="Archive totals">
   <div>

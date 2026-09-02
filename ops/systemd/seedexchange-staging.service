@@ -1,0 +1,21 @@
+[Unit]
+Description=Seedexchange staging web
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=seedexchange
+Group=seedexchange
+WorkingDirectory=/projects/seedexchange.online/current
+EnvironmentFile=/projects/seedexchange.online/shared/staging.env
+ExecStart=/usr/bin/node dist/src/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/projects/seedexchange.online/shared
+
+[Install]
+WantedBy=multi-user.target

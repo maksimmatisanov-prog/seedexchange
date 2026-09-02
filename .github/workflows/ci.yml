@@ -1,0 +1,61 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seedexchange-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seedexchange
+          POSTGRES_PASSWORD: seedexchange_test
+          POSTGRES_DB: seedexchange_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U seedexchange -d seedexchange_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      PORT: 4000
+      HOST: 127.0.0.1
+      APP_URL: http://127.0.0.1:4000
+      DATABASE_URL: postgresql://seedexchange:seedexchange_test@127.0.0.1:5432/seedexchange_test
+      TEST_DATABASE_URL: postgresql://seedexchange:seedexchange_test@127.0.0.1:5432/seedexchange_test
+      SESSION_SECRET: ci-only-session-secret-with-more-than-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seedexchange-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/
+            public/
+            src/templates/
+            src/db/migrations/
+            package.json
+            package-lock.json
+            .nvmrc

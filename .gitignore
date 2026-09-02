@@ -2,5 +2,8 @@ node_modules/
 dist/
 .env
 *.log
+storage/
+playwright-report/
+test-results/
 .DS_Store
 thumbs.db

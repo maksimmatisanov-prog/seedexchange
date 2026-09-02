@@ -1,0 +1,9 @@
+staging.seedexchange.online {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:4100
+  header {
+    X-Robots-Tag "noindex, nofollow"
+  }
+}
+
+# Production remains intentionally absent until the cutover gate is approved.

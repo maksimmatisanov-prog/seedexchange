@@ -1,4 +1,4 @@
-/* Seedexchange — Botanical Archive Design System */
+/* Seedexchange Botanical Archive Design System */
 /* Tokens */
 :root {
   --ink: #18352a;
@@ -10,7 +10,7 @@
   --leaf: #316b4d;
   --leaf-dark: #21543b;
   --sun: #a8742a;
-  --muted: #647168;
+  --muted: #56635a;
   --line: #d7d9cc;
   --on-accent: #fffdf7;
   --on-dark: #f4efe2;
@@ -35,6 +35,8 @@ img { max-width: 100%; height: auto; display: block; }
 a { color: var(--leaf); }
 a:visited { color: var(--forest); }
 h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
+button, input, select, textarea { font: inherit; }
+:focus-visible { outline: 3px solid var(--sun); outline-offset: 3px; }
 
 /* Skip link */
 .skip-link {
@@ -70,6 +72,8 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
 .nav-links a:hover, .nav-links a[aria-current="page"] { opacity: 1; }
 .nav-actions { display: flex; align-items: center; gap: 12px; }
 .nav-cart { color: var(--on-dark); text-decoration: none; font-size: 0.9rem; }
+.nav-form { display: inline-flex; }
+.nav-toggle { display: none; min-height: 44px; padding: 8px 12px; color: var(--on-dark); background: transparent; border: 1px solid rgba(255,255,255,.35); border-radius: 8px; }
 
 /* Buttons */
 .button {
@@ -98,15 +102,22 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
 /* Hero */
 .home-hero {
   background: var(--forest); color: var(--on-dark);
-  padding: 96px 24px 80px;
-  text-align: center;
+  padding: 72px max(24px, calc((100vw - 1240px) / 2));
+  display: grid; grid-template-columns: minmax(0, .9fr) minmax(360px, 1.1fr); gap: 64px; align-items: center;
 }
-.hero-copy { max-width: 700px; margin: 0 auto; }
+.hero-copy { max-width: 620px; }
 .hero-copy h1 {
   font-size: clamp(2rem, 5vw, 3.5rem);
   margin: 16px 0 24px; color: var(--on-dark);
 }
 .hero-copy p { font-size: 1.1rem; opacity: 0.9; margin-bottom: 32px; }
+.hero-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.hero-actions > a:not(.button) { color: var(--on-dark); }
+.button-light { background: var(--paper); color: var(--forest); }
+.button-light:visited { color: var(--forest); }
+.button-light:hover { background: var(--surface); }
+.hero-visual { aspect-ratio: 4/3; overflow: hidden; border-radius: 16px; }
+.hero-visual img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Eyebrow */
 .eyebrow {
@@ -114,6 +125,7 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
   text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--muted); margin-bottom: 8px;
 }
+.home-hero .eyebrow { color: var(--on-dark); opacity: 0.9; }
 
 /* Archive paths */
 .archive-paths { background: var(--paper); }
@@ -137,6 +149,53 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
   margin-left: auto; color: var(--leaf); font-weight: 600;
   font-size: 0.9rem; white-space: nowrap;
 }
+
+.paper-section { background: var(--paper); }
+.result-bar { margin-bottom: 24px; color: var(--muted); }
+.product-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 24px; margin-top: 32px; }
+.product-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.product-image { display: block; aspect-ratio: 4/3; background: var(--paper); overflow: hidden; }
+.product-image img { width: 100%; height: 100%; object-fit: cover; }
+.product-card-body { padding: 18px; }
+.product-source { font-size: .8rem; margin-bottom: 6px; }
+.product-card h3 { font-size: 1.15rem; }
+.product-card h3 a { color: var(--ink); text-decoration: none; }
+.botanical-name { color: var(--muted); margin-top: 4px; }
+.product-card-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; font-size: .9rem; }
+.product-card-meta span { color: var(--muted); }
+.organization-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.organization-card { padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; color: var(--ink); text-decoration: none; }
+.organization-card span,.organization-card small { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.organization-card h2,.organization-card h3 { margin: 12px 0; }
+.organization-card p { color: var(--muted); }
+.exchange-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.exchange-grid article { padding: 28px 0; border-bottom: 1px solid var(--line); }
+.exchange-grid h2 { margin: 8px 0; }
+.empty-state { padding: 56px; text-align: center; border: 1px dashed var(--line); background: var(--paper); border-radius: 14px; }
+.empty-state p { color: var(--muted); margin-top: 8px; }
+.filter-panel,.search-form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)) auto; gap: 16px; align-items: end; margin-bottom: 28px; }
+.filter-panel label,.search-form label,.form label { display: grid; gap: 7px; font-weight: 600; }
+input,select,textarea { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink); background: var(--surface); }
+textarea { min-height: 120px; resize: vertical; }
+.profile-hero,.product-detail,.form-page { max-width: var(--container); margin: 0 auto; padding: 72px 24px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 64px; align-items: start; }
+.profile-hero h1,.product-detail h1,.form-page h1 { font-size: clamp(2.2rem,5vw,4.5rem); margin: 10px 0 20px; }
+.profile-hero dl { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; }
+.profile-hero dl div { padding: 24px; background: var(--paper); border-radius: 14px; }
+.profile-hero dd { font: 2rem var(--font-display); }
+.product-detail-image { aspect-ratio: 4/3; background: var(--paper); overflow: hidden; border-radius: 16px; }
+.product-detail-image img { width: 100%; height: 100%; object-fit: cover; }
+.product-detail-copy > * + * { margin-top: 16px; }
+.detail-price { display: block; font: 2rem var(--font-display); }
+.breadcrumbs { padding-bottom: 0; display: flex; gap: 10px; }
+.panel { padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.form { display: grid; gap: 18px; }
+.form label span { font-size: .8rem; color: var(--muted); font-weight: 400; }
+.form-error { padding: 12px; color: var(--danger); background: #fff1ee; border-left: 4px solid var(--danger); }
+.message-page { max-width: 720px; min-height: 60dvh; margin: 0 auto; padding: 96px 24px; text-align: center; }
+.message-page p { margin: 16px 0 24px; }
+.workspace > h2 { margin: 40px 0 16px; }
+.record-list { display: grid; }
+.record-list a { display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
 
 /* Metrics */
 .archive-metrics {
@@ -188,10 +247,23 @@ h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .nav-links { display: none; }
+  .nav { flex-wrap: wrap; padding-inline: 16px; }
+  .nav-toggle { display: inline-flex; margin-left: auto; }
+  .nav-links { display: none; order: 4; width: 100%; flex-direction: column; padding: 16px 0; }
+  .nav-links--open { display: flex; }
+  .nav-actions { width: 100%; order: 5; flex-wrap: wrap; display: none; }
+  .nav:has(.nav-links--open) .nav-actions { display: flex; }
+  .home-hero { grid-template-columns: 1fr; padding: 48px 16px; gap: 32px; }
+  .hero-copy h1 { font-size: clamp(2.4rem,12vw,4rem); }
   .archive-row { flex-direction: column; align-items: flex-start; gap: 8px; }
   .archive-link { margin-left: 0; }
   .archive-metrics { flex-direction: column; gap: 24px; }
   .founder-callout { flex-direction: column; text-align: center; }
   .section { padding: 48px 16px; }
+  .product-grid,.organization-grid,.exchange-grid,.filter-panel,.search-form,.profile-hero,.product-detail,.form-page { grid-template-columns: 1fr; }
+  .profile-hero,.product-detail,.form-page { padding: 48px 16px; gap: 32px; }
+  .empty-state { padding: 36px 20px; }
 }
+
+@media (min-width: 769px) and (max-width: 1050px) { .product-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

@@ -15,7 +15,7 @@
   <meta property="og:url" content="https://seedexchange.online<%= typeof canonical !== 'undefined' ? canonical : '/' %>">
   <meta property="og:title" content="<%= title %>">
   <meta property="og:description" content="<%= description %>">
-  <meta property="og:image" content="/assets/hero-botanical-archive-v3.png">
+  <meta property="og:image" content="<%= appUrl %>/assets/hero-botanical-archive-v3.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="<%= title %>">
   <meta name="twitter:description" content="<%= description %>">
@@ -36,7 +36,8 @@
   <header class="site-header">
     <nav class="nav" aria-label="Main navigation">
       <a href="/" class="nav-brand">Seedexchange</a>
-      <ul class="nav-links">
+      <button class="nav-toggle" type="button" aria-controls="primary-navigation" aria-expanded="false">Menu</button>
+      <ul class="nav-links" id="primary-navigation">
         <li><a href="/directory">Directory</a></li>
         <li><a href="/marketplace">Marketplace</a></li>
         <li><a href="/exchange">Exchange</a></li>
@@ -44,8 +45,13 @@
       </ul>
       <div class="nav-actions">
         <a href="/cart" class="nav-cart">Cart</a>
+        <% if (currentUser) { %>
+        <a href="/account" class="button button-small">Account</a>
+        <form method="post" action="/logout" class="nav-form"><input type="hidden" name="csrf" value="<%= csrfToken %>"><button class="button button-small button-secondary">Sign out</button></form>
+        <% } else { %>
         <a href="/login" class="button button-small">Sign in</a>
         <a href="/register" class="button button-small button-secondary">Register</a>
+        <% } %>
       </div>
     </nav>
   </header>

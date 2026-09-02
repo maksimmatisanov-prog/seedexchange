@@ -1,0 +1,5 @@
+<section class="page-intro"><h1><%= title %></h1><p><%= description %></p></section>
+<section class="section"><p class="result-bar"><%= organizations.length %> approved organizations</p>
+  <% if (organizations.length) { %><div class="organization-grid"><% organizations.forEach(function(organization){ %><a class="organization-card" href="/directory/<%= organization.slug %>"><span><%= organization.type.replaceAll('_',' ') %> in <%= organization.country %></span><h2><%= organization.name %></h2><p><%= organization.specialties || organization.description %></p><% if (organization.founder_slot) { %><small>Founding Organization #<%= organization.founder_slot %></small><% } %></a><% }) %></div>
+  <% } else { %><div class="empty-state"><h2>The directory is being prepared</h2><p>Approved organizations will appear here after migration and review.</p></div><% } %>
+</section>
