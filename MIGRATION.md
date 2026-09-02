@@ -6,7 +6,7 @@ Audit snapshot: 2026-09-02.
 
 - Target: Fastify 5, EJS, TypeScript and PostgreSQL.
 - Legacy reference: PHP/MySQL application at `../apps/seedexchange-php`.
-- Repository state at audit: one local commit (`027f951`), branch `master`, no remote configured, clean working tree before this documentation pass.
+- Repository state at the initial audit: one local commit (`027f951`), branch `master`, no remote configured, clean working tree before the documentation pass. The repository is now connected to `git@github.com:maksimmatisanov-prog/seedexchange.git` and the deployment commits have been pushed.
 - Production remains on the legacy path. No deployment or production mutation was performed during this audit.
 
 ## Implemented locally
@@ -30,7 +30,7 @@ Audit snapshot: 2026-09-02.
 - Fresh production inventory and explicit legacy column/status reconciliation before any real import.
 - Two full production-snapshot migration rehearsals and full media SHA-256 verification.
 - Seeded buyer/seller/admin Playwright acceptance, performance/load evidence, backup/restore drill and monitoring.
-- Private GitHub remote, observed CI run and closed staging deployment.
+- Confirm repository visibility, observe a successful GitHub CI run and publish the closed staging endpoint after the access-control gate is explicitly approved.
 
 ## Safety boundary
 
@@ -47,6 +47,17 @@ All operational package commands now compile and exist. Payment flags remain off
 - `npm audit --json`: 0 known vulnerabilities at the recorded check.
 - Local built runtime on port 4057: `/health`, `/`, `/about`, `/assets/app.css` and `/robots.txt` returned 200; an unknown route returned 404. The temporary server was stopped after the check.
 - Live read-only HTTP audit: `/`, `/directory/`, `/marketplace/`, `/exchange/`, `/robots.txt` and `/sitemap.xml` returned 200. The live response identified `PHP/8.3.33`; `/health` returned 404. This confirms production is still the PHP application, not this Node target.
+
+## Staging deployment evidence from 2026-09-02
+
+- Immutable release `0aea23e` is active at `/srv/seedexchange/current` on the existing VPS. The web service listens only on `127.0.0.1:4100` and is enabled in systemd.
+- The release archive SHA-256 was checked before activation. Server-side `npm ci`, TypeScript, Vitest and clean build passed; the run recorded 10 passing tests, one database integration test skipped without `TEST_DATABASE_URL`, and zero known npm audit findings.
+- PostgreSQL 16 database `seedexchange_staging` is owned through the isolated `seedexchange` peer-auth role. Both ordered migrations applied once, the repeat run was a no-op, and `/ready` reported migration `002_legacy_compatibility.sql`.
+- Local VPS smoke returned 200 for health, readiness, public pages, auth pages, assets, robots and sitemap; protected account, messages and admin routes returned 401 and an unknown route returned 404.
+- Marketplace and sitemap workers completed successfully and their timers are enabled. Outbox remains disabled because staging SMTP is intentionally unconfigured; enabling it now would create a repeating failed job.
+- `CONNECT_ENABLED`, `MARKETPLACE_PAYMENTS_ENABLED` and `PAYOUT_WORKER_ENABLED` are all `0`. No production data was imported and no production traffic, DNS or payment state was changed.
+- Public Caddy exposure remains gated. The temporary TLS endpoint and Basic Auth credentials were not created because external publication requires separate explicit approval.
+- Capacity remains staging-only: 1 vCPU, 3.8 GiB RAM and 18 GiB free disk were observed before deployment.
 
 ## Migration order
 
