@@ -25,7 +25,7 @@ npm run build
 npm prune --omit=dev
 ln -s "$root/shared/staging.env" .env
 ln -s "$root/shared/storage" storage
-node dist/src/db/migrate.js
+sudo -u seedexchange -- node dist/src/db/migrate.js
 
 previous=''
 if [[ -L "$root/current" ]]; then previous=$(readlink -f "$root/current"); fi
