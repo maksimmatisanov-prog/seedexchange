@@ -6,8 +6,8 @@ After=network.target postgresql.service
 Type=simple
 User=seedexchange
 Group=seedexchange
-WorkingDirectory=/projects/seedexchange.online/current
-EnvironmentFile=/projects/seedexchange.online/shared/staging.env
+WorkingDirectory=/srv/seedexchange/current
+EnvironmentFile=/srv/seedexchange/shared/staging.env
 ExecStart=/usr/bin/node dist/src/server.js
 Restart=on-failure
 RestartSec=5
@@ -15,7 +15,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/projects/seedexchange.online/shared
+ReadWritePaths=/srv/seedexchange/shared
 
 [Install]
 WantedBy=multi-user.target

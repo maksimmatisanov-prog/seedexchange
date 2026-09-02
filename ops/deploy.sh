@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-root=/projects/seedexchange.online
+root=/srv/seedexchange
 artifact=${1:-}
 release_id=${2:-$(date -u +%Y%m%dT%H%M%SZ)}
 release="$root/releases/$release_id"
