@@ -30,7 +30,7 @@ Audit snapshot: 2026-09-02.
 - Fresh production inventory and explicit legacy column/status reconciliation before any real import.
 - Two full production-snapshot migration rehearsals and full media SHA-256 verification.
 - Seeded buyer/seller/admin Playwright acceptance, performance/load evidence, backup/restore drill and monitoring.
-- Confirm repository visibility, observe a successful GitHub CI run and publish the closed staging endpoint after the access-control gate is explicitly approved.
+- Confirm repository visibility, observe a successful GitHub CI run and complete authenticated browser acceptance against the closed staging endpoint.
 
 ## Safety boundary
 
@@ -56,7 +56,7 @@ All operational package commands now compile and exist. Payment flags remain off
 - Local VPS smoke returned 200 for health, readiness, public pages, auth pages, assets, robots and sitemap; protected account, messages and admin routes returned 401 and an unknown route returned 404.
 - Marketplace and sitemap workers completed successfully and their timers are enabled. Outbox remains disabled because staging SMTP is intentionally unconfigured; enabling it now would create a repeating failed job.
 - `CONNECT_ENABLED`, `MARKETPLACE_PAYMENTS_ENABLED` and `PAYOUT_WORKER_ENABLED` are all `0`. No production data was imported and no production traffic, DNS or payment state was changed.
-- Public Caddy exposure remains gated. The temporary TLS endpoint and Basic Auth credentials were not created because external publication requires separate explicit approval.
+- After explicit approval, Caddy published `https://seedexchange-staging.187.52.119.107.sslip.io` behind Basic Auth without changing the production domain or DNS. External verification returned 401 without credentials, 200 for health, readiness, representative public pages, assets and sitemap with credentials, and 404 for an unknown route. Responses include `X-Robots-Tag: noindex, nofollow, noarchive`.
 - Capacity remains staging-only: 1 vCPU, 3.8 GiB RAM and 18 GiB free disk were observed before deployment.
 
 ## Migration order
