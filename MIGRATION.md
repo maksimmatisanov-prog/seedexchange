@@ -81,6 +81,7 @@ All operational package commands now compile and exist. Payment flags remain off
 - Seller fulfilment now supports CSRF-protected `paid -> processing -> shipped` transitions, required carrier/tracking details, a 30-day delivery deadline, buyer notification and duplicate-transition rejection. Only the owning buyer can confirm a shipped seller order; all delivered sub-orders complete the parent order.
 - Buyers can open one active delivery case after shipment. The parent order becomes disputed, organization administrators are notified, confirmation is blocked while the case is open, and the existing marketplace worker continues to withhold transfer eligibility.
 - Local fulfilment acceptance passed 7/7, including RBAC, invalid CSRF, repeated shipment 409, tracking persistence, parent/seller status changes, notifications and audit events. Teardown returned all eight checked entity counts to zero before the exact temporary database was removed; staging received no fixtures and payment flags remained disabled.
+- Immutable staging release `11f2672` is active with PostgreSQL migration `002`, healthy process and readiness checks, and zero known production dependency vulnerabilities. External read-only Playwright passed 9/9 at 375, 768 and 1440 px; no staging fixtures, payment changes or production changes were made.
 
 ## Migration order
 
