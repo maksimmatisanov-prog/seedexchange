@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
-import { canManageOrganization } from '../domain/rules.js';
+import { canManageOrganization, canTransitionSellerOrder } from '../domain/rules.js';
 import { pageModel } from '../lib/view.js';
 import { audit } from '../services/audit.js';
 import { assertCsrf, requireRole, requireUser } from '../services/sessions.js';
@@ -80,6 +80,38 @@ export async function registerOperationRoutes(app: FastifyInstance) {
     const created=await pool.query<{id:string}>(`INSERT INTO exchange_listings(organization_id,mode,title,species,quantity_available,description) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[form.organization_id,form.mode,form.title,form.species||null,form.quantity_available||null,form.description]);
     await audit(user.id,'exchange',created.rows[0].id,'exchange.published');
     return reply.redirect(`/seller/organization/${form.organization_id}`,303);
+  });
+
+  app.post<{Params:{id:string}}>('/seller/order/:id/processing',async(request,reply)=>{
+    const user=requireUser(request); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf);
+    const sellerOrder=await pool.query<{organization_id:string;status:string}>('SELECT organization_id,status FROM seller_orders WHERE id=$1',[request.params.id]);
+    if(!sellerOrder.rows[0])throw Object.assign(new Error('Seller order not found.'),{statusCode:404});
+    await requireOrganization(user,sellerOrder.rows[0].organization_id);
+    if(sellerOrder.rows[0].status!=='paid' || !canTransitionSellerOrder(sellerOrder.rows[0].status,'processing'))throw Object.assign(new Error('Seller order cannot enter processing from its current status.'),{statusCode:409});
+    const updated=await pool.query('UPDATE seller_orders SET status=$1,updated_at=now() WHERE id=$2 AND status=$3 RETURNING id',['processing',request.params.id,sellerOrder.rows[0].status]);
+    if(!updated.rowCount)throw Object.assign(new Error('Seller order changed while it was being updated.'),{statusCode:409});
+    await audit(user.id,'seller_order',request.params.id,'seller_order.processing');
+    return reply.redirect(`/seller/organization/${sellerOrder.rows[0].organization_id}`,303);
+  });
+
+  app.post<{Params:{id:string}}>('/seller/order/:id/ship',async(request,reply)=>{
+    const user=requireUser(request); const form=z.object({csrf:z.string(),carrier:z.string().trim().min(2).max(120),tracking_number:z.string().trim().min(2).max(190),tracking_url:z.union([z.literal(''),z.string().url().max(500)]).default('')}).parse(request.body); assertCsrf(request,form.csrf);
+    const sellerOrder=await pool.query<{organization_id:string;status:string;order_id:string}>('SELECT organization_id,status,order_id FROM seller_orders WHERE id=$1',[request.params.id]);
+    if(!sellerOrder.rows[0])throw Object.assign(new Error('Seller order not found.'),{statusCode:404});
+    await requireOrganization(user,sellerOrder.rows[0].organization_id);
+    if(!['paid','processing'].includes(sellerOrder.rows[0].status) || !canTransitionSellerOrder(sellerOrder.rows[0].status,'shipped'))throw Object.assign(new Error('Seller order cannot be shipped from its current status.'),{statusCode:409});
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      const updated=await client.query(`UPDATE seller_orders SET status='shipped',carrier=$1,tracking_number=$2,tracking_url=$3,shipped_at=now(),delivery_due_at=now()+interval '30 days',updated_at=now() WHERE id=$4 AND status=$5 RETURNING id`,[form.carrier,form.tracking_number,form.tracking_url||null,request.params.id,sellerOrder.rows[0].status]);
+      if(!updated.rowCount)throw Object.assign(new Error('Seller order changed while it was being updated.'),{statusCode:409});
+      await client.query(`UPDATE orders SET status='partially_fulfilled',updated_at=now() WHERE id=$1 AND status='paid'`,[sellerOrder.rows[0].order_id]);
+      await client.query(`INSERT INTO notifications(user_id,type,title,body,action_url)
+        SELECT user_id,'seller_order_shipped','Your order has shipped',$2,$3 FROM orders WHERE id=$1 AND user_id IS NOT NULL`,[sellerOrder.rows[0].order_id,`${form.carrier}: ${form.tracking_number}`,`/account/orders/${sellerOrder.rows[0].order_id}`]);
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    await audit(user.id,'seller_order',request.params.id,'seller_order.shipped',{carrier:form.carrier,trackingNumber:form.tracking_number});
+    return reply.redirect(`/seller/organization/${sellerOrder.rows[0].organization_id}`,303);
   });
 
   app.get('/admin', async (request, reply) => {

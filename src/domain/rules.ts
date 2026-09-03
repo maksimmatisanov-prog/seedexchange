@@ -40,6 +40,18 @@ export function canTransitionOrder(from: string, to: string): boolean {
   return from === to || Boolean(orderTransitions[from]?.has(to));
 }
 
+const sellerOrderTransitions: Record<string, ReadonlySet<string>> = {
+  paid: new Set(['processing', 'shipped', 'cancelled', 'refunded', 'disputed']),
+  processing: new Set(['shipped', 'cancelled', 'refunded', 'disputed']),
+  shipped: new Set(['delivered', 'refunded', 'disputed']),
+  delivered: new Set(['refunded', 'disputed']),
+  disputed: new Set(['shipped', 'delivered', 'refunded']),
+};
+
+export function canTransitionSellerOrder(from: string, to: string): boolean {
+  return from === to || Boolean(sellerOrderTransitions[from]?.has(to));
+}
+
 export function nextFounderSlot(currentSlot: number): number | null {
   if (!Number.isInteger(currentSlot) || currentSlot < 0 || currentSlot > 50) throw new Error('Founder slot state is invalid.');
   return currentSlot < 50 ? currentSlot + 1 : null;

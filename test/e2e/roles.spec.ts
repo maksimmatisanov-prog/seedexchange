@@ -19,6 +19,7 @@ let database: pg.Pool;
 let organizationId: string;
 let productId: string;
 let productSlug: string;
+let buyerUserId: string;
 let sellerUserId: string;
 let adminUserId: string;
 
@@ -29,6 +30,16 @@ async function login(page: Page, email: string): Promise<void> {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.locator('main')).toContainText(email);
+}
+
+async function createPaidOrder(): Promise<{orderId:string;sellerOrderId:string}> {
+  const order=await database.query<{id:string}>(`INSERT INTO orders(user_id,email,status,subtotal_cents,shipping_cents,total_cents,shipping_country,shipping_address_status)
+    VALUES($1,$2,'paid',345,425,770,'PL','collected') RETURNING id`,[buyerUserId,emails.buyer]);
+  const sellerOrder=await database.query<{id:string}>(`INSERT INTO seller_orders(order_id,organization_id,status,subtotal_cents,shipping_cents,commission_bps,commission_cents,seller_net_cents,payout_policy,transfer_status)
+    VALUES($1,$2,'paid',345,425,1000,34,736,'delivery_protected','held') RETURNING id`,[order.rows[0].id,organizationId]);
+  await database.query(`INSERT INTO order_items(order_id,seller_order_id,organization_id,product_id,sku,name,unit_price_cents,quantity)
+    SELECT $1,$2,organization_id,id,sku,name,price_cents,1 FROM products WHERE id=$3`,[order.rows[0].id,sellerOrder.rows[0].id,productId]);
+  return {orderId:order.rows[0].id,sellerOrderId:sellerOrder.rows[0].id};
 }
 
 test.describe('buyer, seller and administrator acceptance', () => {
@@ -72,6 +83,7 @@ test.describe('buyer, seller and administrator acceptance', () => {
       organizationId = organization.rows[0].id;
       await client.query(`INSERT INTO organization_members(organization_id,user_id,role) VALUES($1,$2,'member'),($1,$3,'admin')`,
         [organizationId, userIds.get('member'), userIds.get('seller')]);
+      buyerUserId = userIds.get('buyer')!;
       sellerUserId = userIds.get('seller')!;
       adminUserId = userIds.get('admin')!;
       await client.query('COMMIT');
@@ -85,10 +97,15 @@ test.describe('buyer, seller and administrator acceptance', () => {
 
   test.afterAll(async () => {
     if (!database) return;
+    await database.query(`DELETE FROM delivery_cases WHERE seller_order_id IN (SELECT id FROM seller_orders WHERE organization_id=$1)`,[organizationId]);
+    await database.query(`DELETE FROM order_items WHERE organization_id=$1`,[organizationId]);
+    await database.query(`DELETE FROM seller_orders WHERE organization_id=$1`,[organizationId]);
+    await database.query(`DELETE FROM orders WHERE email=ANY($1::text[])`,[Object.values(emails)]);
     await database.query('DELETE FROM exchange_listings WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM seller_shipping_zones WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM products WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM organizations WHERE id=$1', [organizationId]);
+    await database.query(`DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email=ANY($1::text[]))`,[Object.values(emails)]);
     await database.query(`DELETE FROM audit_events WHERE actor_user_id IN
       (SELECT id FROM users WHERE email=ANY($1::text[]))`, [Object.values(emails)]);
     await database.query('DELETE FROM users WHERE email=ANY($1::text[])', [Object.values(emails)]);
@@ -183,5 +200,55 @@ test.describe('buyer, seller and administrator acceptance', () => {
     expect((await page.goto(`/product/${productSlug}`))?.status()).toBe(200);
     await page.goto(`/seller/organization/${organizationId}`);
     await expect(page.getByRole('heading', { name: `Acceptance Grower ${runId}` })).toBeVisible();
+  });
+
+  test('seller ships a paid order and the buyer confirms delivery',async({page})=>{
+    const {orderId,sellerOrderId}=await createPaidOrder();
+    await login(page,emails.seller); await page.goto(`/seller/organization/${organizationId}`);
+    const rejected=await page.context().request.post(`/seller/order/${sellerOrderId}/processing`,{form:{csrf:'invalid'}});
+    expect(rejected.status()).toBe(403);
+    let article=page.locator('article').filter({hasText:`Seller order #${sellerOrderId}`});
+    await article.getByRole('button',{name:'Start processing'}).click();
+    article=page.locator('article').filter({hasText:`Seller order #${sellerOrderId}`});
+    await expect(article).toContainText('processing');
+    const shipForm=article.locator(`form[action="/seller/order/${sellerOrderId}/ship"]`);
+    await shipForm.getByLabel('Carrier').fill('Acceptance Post');
+    await shipForm.getByLabel('Tracking number').fill(`TRACK-${runId}`);
+    await shipForm.getByLabel('Tracking URL').fill(`https://tracking.example.test/${runId}`);
+    await shipForm.getByRole('button',{name:'Mark as shipped'}).click();
+    const sellerCsrf=await page.locator('input[name="csrf"]').first().inputValue();
+    const repeatedShipment=await page.context().request.post(`/seller/order/${sellerOrderId}/ship`,{form:{csrf:sellerCsrf,carrier:'Acceptance Post',tracking_number:`TRACK-${runId}`,tracking_url:`https://tracking.example.test/${runId}`}});
+    expect(repeatedShipment.status()).toBe(409);
+    const shipped=await database.query<{status:string;transfer_status:string;has_dates:boolean}>(`SELECT status,transfer_status,shipped_at IS NOT NULL AND delivery_due_at BETWEEN now()+interval '29 days' AND now()+interval '31 days' has_dates FROM seller_orders WHERE id=$1`,[sellerOrderId]);
+    expect(shipped.rows[0]).toMatchObject({status:'shipped',transfer_status:'held',has_dates:true});
+    expect((await database.query<{status:string}>('SELECT status FROM orders WHERE id=$1',[orderId])).rows[0].status).toBe('partially_fulfilled');
+    expect((await database.query(`SELECT 1 FROM audit_events WHERE actor_user_id=$1 AND entity_id=$2 AND event_name=ANY($3::text[])`,[sellerUserId,sellerOrderId,['seller_order.processing','seller_order.shipped']])).rowCount).toBe(2);
+    expect((await database.query(`SELECT 1 FROM notifications WHERE user_id=$1 AND type='seller_order_shipped' AND action_url=$2`,[buyerUserId,`/account/orders/${orderId}`])).rowCount).toBe(1);
+
+    await page.context().clearCookies(); await login(page,emails.buyer); await page.goto(`/account/orders/${orderId}`);
+    await expect(page.locator('main')).toContainText(`TRACK-${runId}`);
+    await page.getByRole('button',{name:'Confirm delivery'}).click();
+    expect((await database.query<{status:string;delivered:boolean}>('SELECT status,delivered_at IS NOT NULL delivered FROM seller_orders WHERE id=$1',[sellerOrderId])).rows[0]).toMatchObject({status:'delivered',delivered:true});
+    expect((await database.query<{status:string}>('SELECT status FROM orders WHERE id=$1',[orderId])).rows[0].status).toBe('fulfilled');
+    expect((await database.query(`SELECT 1 FROM audit_events WHERE actor_user_id=$1 AND entity_id=$2 AND event_name='seller_order.delivery_confirmed'`,[buyerUserId,sellerOrderId])).rowCount).toBe(1);
+  });
+
+  test('buyer opens a delivery case and confirmation remains blocked',async({page})=>{
+    const {orderId,sellerOrderId}=await createPaidOrder();
+    await database.query(`UPDATE seller_orders SET status='shipped',shipped_at=now(),delivery_due_at=now()+interval '30 days' WHERE id=$1`,[sellerOrderId]);
+    await database.query(`UPDATE orders SET status='partially_fulfilled' WHERE id=$1`,[orderId]);
+    await login(page,emails.buyer); await page.goto(`/account/orders/${orderId}`);
+    const caseForm=page.locator(`form[action="/account/orders/${orderId}/seller/${sellerOrderId}/delivery-case"]`);
+    await caseForm.getByLabel('Issue').selectOption('not_received');
+    await caseForm.getByLabel('Details').fill('The tracked parcel has not arrived within the expected delivery window.');
+    await caseForm.getByRole('button',{name:'Open delivery case'}).click();
+    await expect(page.getByText('A delivery case is open.')).toBeVisible();
+    expect((await database.query(`SELECT 1 FROM delivery_cases WHERE seller_order_id=$1 AND opened_by_user_id=$2 AND reason='not_received' AND status='open'`,[sellerOrderId,buyerUserId])).rowCount).toBe(1);
+    expect((await database.query<{status:string}>('SELECT status FROM orders WHERE id=$1',[orderId])).rows[0].status).toBe('disputed');
+    expect((await database.query(`SELECT 1 FROM notifications WHERE user_id=$1 AND type='delivery_case_opened'`,[sellerUserId])).rowCount).toBe(1);
+    expect((await database.query(`SELECT 1 FROM audit_events WHERE actor_user_id=$1 AND entity_type='delivery_case' AND event_name='delivery_case.opened'`,[buyerUserId])).rowCount).toBe(1);
+    const csrf=await page.locator('input[name="csrf"]').first().inputValue();
+    const confirmation=await page.context().request.post(`/account/orders/${orderId}/seller/${sellerOrderId}/confirm-delivery`,{form:{csrf}});
+    expect(confirmation.status()).toBe(409);
   });
 });

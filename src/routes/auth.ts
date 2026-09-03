@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
+import { canTransitionSellerOrder } from '../domain/rules.js';
 import { pageModel } from '../lib/view.js';
 import { audit } from '../services/audit.js';
 import { assertCsrf, destroySession, requireUser, rotateSession } from '../services/sessions.js';
@@ -127,9 +128,51 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     const order = await pool.query('SELECT * FROM orders WHERE id=$1 AND user_id=$2', [request.params.id, user.id]);
     if (!order.rows[0]) throw Object.assign(new Error('Order not found.'), { statusCode: 404 });
     const [sellerOrders, items] = await Promise.all([
-      pool.query(`SELECT s.*,o.name organization_name FROM seller_orders s JOIN organizations o ON o.id=s.organization_id WHERE s.order_id=$1 ORDER BY s.id`, [request.params.id]),
+      pool.query(`SELECT s.*,o.name organization_name,EXISTS(SELECT 1 FROM delivery_cases dc WHERE dc.seller_order_id=s.id AND dc.status IN ('open','reviewing')) has_open_case FROM seller_orders s JOIN organizations o ON o.id=s.organization_id WHERE s.order_id=$1 ORDER BY s.id`, [request.params.id]),
       pool.query('SELECT * FROM order_items WHERE order_id=$1 ORDER BY id', [request.params.id]),
     ]);
     return reply.view('pages/account/order.ejs', pageModel(request, { title: `Order #${request.params.id}`, description: 'Order details and fulfilment status.', canonical: null, order: order.rows[0], sellerOrders: sellerOrders.rows, items: items.rows }));
+  });
+
+  app.post<{Params:{orderId:string;sellerOrderId:string}}>('/account/orders/:orderId/seller/:sellerOrderId/confirm-delivery',async(request,reply)=>{
+    const user=requireUser(request); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf);
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      const result=await client.query<{status:string}>(`SELECT so.status FROM seller_orders so JOIN orders o ON o.id=so.order_id
+        WHERE so.id=$1 AND so.order_id=$2 AND o.user_id=$3 FOR UPDATE OF so`,[request.params.sellerOrderId,request.params.orderId,user.id]);
+      if(!result.rows[0])throw Object.assign(new Error('Seller order not found.'),{statusCode:404});
+      if(!canTransitionSellerOrder(result.rows[0].status,'delivered') || result.rows[0].status!=='shipped')throw Object.assign(new Error('Only a shipped order can be confirmed as delivered.'),{statusCode:409});
+      const openCase=await client.query(`SELECT 1 FROM delivery_cases WHERE seller_order_id=$1 AND status IN ('open','reviewing')`,[request.params.sellerOrderId]);
+      if(openCase.rowCount)throw Object.assign(new Error('Resolve the open delivery case before confirming delivery.'),{statusCode:409});
+      await client.query(`UPDATE seller_orders SET status='delivered',delivered_at=now(),updated_at=now() WHERE id=$1`,[request.params.sellerOrderId]);
+      const aggregate=await client.query<{all_delivered:boolean}>(`SELECT bool_and(status='delivered') all_delivered FROM seller_orders WHERE order_id=$1`,[request.params.orderId]);
+      await client.query(`UPDATE orders SET status=$1,updated_at=now() WHERE id=$2`,[aggregate.rows[0].all_delivered?'fulfilled':'partially_fulfilled',request.params.orderId]);
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    await audit(user.id,'seller_order',request.params.sellerOrderId,'seller_order.delivery_confirmed');
+    return reply.redirect(`/account/orders/${request.params.orderId}`,303);
+  });
+
+  app.post<{Params:{orderId:string;sellerOrderId:string}}>('/account/orders/:orderId/seller/:sellerOrderId/delivery-case',async(request,reply)=>{
+    const user=requireUser(request); const form=z.object({csrf:z.string(),reason:z.enum(['not_received','damaged','wrong_item','other']),details:z.string().trim().min(20).max(5000)}).parse(request.body); assertCsrf(request,form.csrf);
+    const client=await pool.connect(); let caseId=''; let organizationId='';
+    try{
+      await client.query('BEGIN');
+      const result=await client.query<{status:string;organization_id:string}>(`SELECT so.status,so.organization_id FROM seller_orders so JOIN orders o ON o.id=so.order_id
+        WHERE so.id=$1 AND so.order_id=$2 AND o.user_id=$3 FOR UPDATE OF so`,[request.params.sellerOrderId,request.params.orderId,user.id]);
+      if(!result.rows[0])throw Object.assign(new Error('Seller order not found.'),{statusCode:404});
+      if(!['shipped','delivered'].includes(result.rows[0].status))throw Object.assign(new Error('A delivery case can be opened only after shipment.'),{statusCode:409});
+      const existing=await client.query(`SELECT 1 FROM delivery_cases WHERE seller_order_id=$1 AND status IN ('open','reviewing')`,[request.params.sellerOrderId]);
+      if(existing.rowCount)throw Object.assign(new Error('An open delivery case already exists.'),{statusCode:409});
+      const created=await client.query<{id:string}>(`INSERT INTO delivery_cases(seller_order_id,opened_by_user_id,reason,details) VALUES($1,$2,$3,$4) RETURNING id`,[request.params.sellerOrderId,user.id,form.reason,form.details]);
+      caseId=created.rows[0].id; organizationId=result.rows[0].organization_id;
+      await client.query(`UPDATE orders SET status='disputed',updated_at=now() WHERE id=$1`,[request.params.orderId]);
+      await client.query(`INSERT INTO notifications(user_id,type,title,body,action_url)
+        SELECT user_id,'delivery_case_opened','A buyer opened a delivery case',$2,$3 FROM organization_members WHERE organization_id=$1 AND role='admin'`,[organizationId,form.details.slice(0,500),`/seller/organization/${organizationId}`]);
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    await audit(user.id,'delivery_case',caseId,'delivery_case.opened',{sellerOrderId:request.params.sellerOrderId,reason:form.reason});
+    return reply.redirect(`/account/orders/${request.params.orderId}`,303);
   });
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateCommissionCents, calculateShippingCents, canManageOrganization, canTransitionOrder, clampCartQuantity, effectiveCommissionBps, nextFounderSlot, reservationExpiresAt } from '../../src/domain/rules.js';
+import { calculateCommissionCents, calculateShippingCents, canManageOrganization, canTransitionOrder, canTransitionSellerOrder, clampCartQuantity, effectiveCommissionBps, nextFounderSlot, reservationExpiresAt } from '../../src/domain/rules.js';
 
 describe('commerce rules', () => {
   it('calculates integer commissions without rounding up', () => {
@@ -30,6 +30,15 @@ describe('permission and state rules', () => {
     expect(canTransitionOrder('pending_payment', 'paid')).toBe(true);
     expect(canTransitionOrder('pending_payment', 'refunded')).toBe(false);
     expect(canTransitionOrder('refunded', 'paid')).toBe(false);
+  });
+
+  it('keeps seller fulfilment transitions monotonic', () => {
+    expect(canTransitionSellerOrder('paid', 'processing')).toBe(true);
+    expect(canTransitionSellerOrder('paid', 'shipped')).toBe(true);
+    expect(canTransitionSellerOrder('processing', 'shipped')).toBe(true);
+    expect(canTransitionSellerOrder('shipped', 'delivered')).toBe(true);
+    expect(canTransitionSellerOrder('delivered', 'processing')).toBe(false);
+    expect(canTransitionSellerOrder('pending_payment', 'shipped')).toBe(false);
   });
 
   it('stops founder allocation after slot fifty', () => {
