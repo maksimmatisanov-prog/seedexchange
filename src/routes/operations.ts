@@ -1,15 +1,22 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
+import { canManageOrganization } from '../domain/rules.js';
 import { pageModel } from '../lib/view.js';
 import { audit } from '../services/audit.js';
 import { assertCsrf, requireRole, requireUser } from '../services/sessions.js';
+import type { CurrentUser } from '../types/fastify.js';
 
 const slugify = (value: string) => value.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 180);
-async function requireOrganization(userId: string, organizationId: string) {
-  const result = await pool.query(`SELECT o.*,m.role member_role FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE o.id=$1 AND m.user_id=$2`, [organizationId, userId]);
-  if (!result.rows[0]) throw Object.assign(new Error('Organization access denied.'), { statusCode: 403 });
-  return result.rows[0];
+async function requireOrganization(user: CurrentUser, organizationId: string) {
+  const result = await pool.query(`SELECT o.*,m.role member_role FROM organizations o
+    LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=$2
+    WHERE o.id=$1`, [organizationId, user.id]);
+  const organization = result.rows[0];
+  if (!organization || !canManageOrganization({ platformRole: user.role, memberRole: organization.member_role })) {
+    throw Object.assign(new Error('Organization access denied.'), { statusCode: 403 });
+  }
+  return organization;
 }
 
 export async function registerOperationRoutes(app: FastifyInstance) {
@@ -34,7 +41,7 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   });
 
   app.get<{ Params: { id: string } }>('/seller/organization/:id', async (request, reply) => {
-    const user = requireUser(request); const organization = await requireOrganization(user.id, request.params.id);
+    const user = requireUser(request); const organization = await requireOrganization(user, request.params.id);
     const [products,zones,exchanges,orders] = await Promise.all([
       pool.query('SELECT * FROM products WHERE organization_id=$1 ORDER BY updated_at DESC', [organization.id]),
       pool.query('SELECT * FROM seller_shipping_zones WHERE organization_id=$1 ORDER BY id DESC', [organization.id]),
@@ -47,7 +54,7 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   app.post('/seller/product', async (request, reply) => {
     const user = requireUser(request);
     const form = z.object({ csrf:z.string(), organization_id:z.coerce.string(), product_id:z.coerce.string().optional(), name:z.string().trim().min(2).max(255), sku:z.string().trim().min(1).max(100), botanical_name:z.string().trim().max(255).default(''), category:z.string().trim().max(100).default(''), description:z.string().trim().min(20).max(10000), price:z.coerce.number().min(.5).max(100000), stock_quantity:z.coerce.number().int().min(0).max(1_000_000), packet_quantity:z.string().trim().max(120).default('') }).parse(request.body);
-    assertCsrf(request,form.csrf); await requireOrganization(user.id,form.organization_id);
+    assertCsrf(request,form.csrf); await requireOrganization(user,form.organization_id);
     const slug = slugify(`${form.name}-${form.sku}`);
     if (form.product_id) {
       await pool.query(`UPDATE products SET name=$1,sku=$2,botanical_name=$3,category=$4,description=$5,price_cents=$6,stock_quantity=$7,packet_quantity=$8,slug=$9,status='pending_review',updated_at=now() WHERE id=$10 AND organization_id=$11`, [form.name,form.sku,form.botanical_name||null,form.category||null,form.description,Math.round(form.price*100),form.stock_quantity,form.packet_quantity||null,slug,form.product_id,form.organization_id]);
@@ -61,14 +68,14 @@ export async function registerOperationRoutes(app: FastifyInstance) {
 
   app.post('/seller/shipping', async (request, reply) => {
     const user=requireUser(request); const form=z.object({csrf:z.string(),organization_id:z.coerce.string(),name:z.string().trim().min(2).max(120),countries:z.string().trim().min(1).max(500),rate:z.coerce.number().min(0).max(10000)}).parse(request.body);
-    assertCsrf(request,form.csrf); await requireOrganization(user.id,form.organization_id);
+    assertCsrf(request,form.csrf); await requireOrganization(user,form.organization_id);
     await pool.query(`INSERT INTO seller_shipping_zones(organization_id,name,countries,rate_cents) VALUES($1,$2,$3,$4)`,[form.organization_id,form.name,form.countries.toUpperCase(),Math.round(form.rate*100)]);
     return reply.redirect(`/seller/organization/${form.organization_id}`,303);
   });
 
   app.post('/seller/exchange', async (request, reply) => {
     const user=requireUser(request); const form=z.object({csrf:z.string(),organization_id:z.coerce.string(),mode:z.enum(['exchange','donate']),title:z.string().trim().min(2).max(255),species:z.string().trim().max(255).default(''),quantity_available:z.string().trim().max(120).default(''),description:z.string().trim().min(20).max(5000)}).parse(request.body);
-    assertCsrf(request,form.csrf); await requireOrganization(user.id,form.organization_id);
+    assertCsrf(request,form.csrf); await requireOrganization(user,form.organization_id);
     const created=await pool.query<{id:string}>(`INSERT INTO exchange_listings(organization_id,mode,title,species,quantity_available,description) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[form.organization_id,form.mode,form.title,form.species||null,form.quantity_available||null,form.description]);
     await audit(user.id,'exchange',created.rows[0].id,'exchange.published');
     return reply.redirect(`/seller/organization/${form.organization_id}`,303);

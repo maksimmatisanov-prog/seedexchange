@@ -29,7 +29,7 @@ Audit snapshot: 2026-09-02.
 - Stripe Connect onboarding, refund, partial refund, dispute, reversal and delivery-case acceptance in test mode.
 - Fresh production inventory and explicit legacy column/status reconciliation before any real import.
 - Two full production-snapshot migration rehearsals and full media SHA-256 verification.
-- Seeded buyer/seller/admin Playwright acceptance, performance/load evidence, backup/restore drill and monitoring.
+- Seeded buyer/seller/admin acceptance against staging, performance/load evidence, backup/restore drill and monitoring.
 - Confirm repository visibility, observe a successful GitHub CI run and complete seeded buyer/seller/admin acceptance against the closed staging endpoint.
 
 ## Safety boundary
@@ -64,6 +64,13 @@ All operational package commands now compile and exist. Payment flags remain off
 - The public Playwright suite now accepts Basic Auth through dedicated environment variables rather than credentials embedded in the staging URL.
 - Remote runs use one worker and deduplicate link checks. Route-only crawling skips non-document assets, while the separate responsive-navigation and accessibility checks continue to load the complete page.
 - A clean authenticated run against `https://staging.seedexchange.online` passed 9/9 checks at 375, 768 and 1440 px, including mobile/tablet menu expansion, desktop navigation visibility, public route/link responses and serious/critical WCAG checks.
+
+## Identity and RBAC evidence from 2026-09-03
+
+- Seller workspace authorization now follows the shared domain rule: organization administrators and platform administrators are allowed, while buyers, non-members and ordinary organization members receive 403.
+- Mutating Playwright acceptance is opt-in and fails closed unless both the application and database are loopback-only, `DATABASE_URL` matches `TEST_DATABASE_URL`, and the database name ends in `_test` or `_acceptance`.
+- The isolated PostgreSQL 14 run applied both migrations and passed buyer login/logout, ordinary-member denial, seller workspace access, platform-admin denial for sellers, platform-admin dashboard access and platform-admin organization override.
+- The complete local browser run passed 13 tests at the applicable viewports with 8 intentional role-test skips on mobile/tablet. The exact temporary database `seedexchange_acceptance` was deleted after the run; no staging users or data were created.
 
 ## Migration order
 
