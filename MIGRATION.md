@@ -30,7 +30,7 @@ Audit snapshot: 2026-09-02.
 - Fresh production inventory and explicit legacy column/status reconciliation before any real import.
 - Two full production-snapshot migration rehearsals and full media SHA-256 verification.
 - Seeded buyer/seller/admin Playwright acceptance, performance/load evidence, backup/restore drill and monitoring.
-- Confirm repository visibility, observe a successful GitHub CI run and complete authenticated browser acceptance against the closed staging endpoint.
+- Confirm repository visibility, observe a successful GitHub CI run and complete seeded buyer/seller/admin acceptance against the closed staging endpoint.
 
 ## Safety boundary
 
@@ -58,6 +58,12 @@ All operational package commands now compile and exist. Payment flags remain off
 - `CONNECT_ENABLED`, `MARKETPLACE_PAYMENTS_ENABLED` and `PAYOUT_WORKER_ENABLED` are all `0`. No production data was imported and no production traffic, DNS or payment state was changed.
 - After explicit approval, Hostinger DNS received `staging.seedexchange.online A 187.52.119.107` with TTL 300. Caddy and `APP_URL` were moved to `https://staging.seedexchange.online` behind Basic Auth, and the temporary `sslip.io` alias was removed after verification. Cloudflare, Google and the workstation resolver returned the expected address; external checks returned 401 without credentials, 200 for health, readiness, representative public pages, assets and sitemap with credentials, and 404 for an unknown route. Responses include `X-Robots-Tag: noindex, nofollow, noarchive`.
 - Capacity remains staging-only: 1 vCPU, 3.8 GiB RAM and 18 GiB free disk were observed before deployment.
+
+## Staging browser evidence from 2026-09-03
+
+- The public Playwright suite now accepts Basic Auth through dedicated environment variables rather than credentials embedded in the staging URL.
+- Remote runs use one worker and deduplicate link checks. Route-only crawling skips non-document assets, while the separate responsive-navigation and accessibility checks continue to load the complete page.
+- A clean authenticated run against `https://staging.seedexchange.online` passed 9/9 checks at 375, 768 and 1440 px, including mobile/tablet menu expansion, desktop navigation visibility, public route/link responses and serious/critical WCAG checks.
 
 ## Migration order
 
