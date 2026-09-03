@@ -77,6 +77,7 @@ All operational package commands now compile and exist. Payment flags remain off
 - Local opt-in write acceptance now runs serially on desktop and covers invalid-CSRF rejection, seller product submission, shipping-zone creation, exchange publication and platform-admin product approval. It verifies stored integer cents, normalized country codes, workflow statuses, seller/admin audit events and public visibility after approval.
 - Shipping-zone creation now emits `shipping_zone.created`. Product moderation returns 404 when no pending row is changed and records the explicit `product.approved` or `product.rejected` event name.
 - The write acceptance passed 5/5 against an isolated PostgreSQL 14 database. Teardown returned users, organizations, products and audit events to zero before the exact temporary database was removed; staging received no fixtures.
+- Immutable staging release `3e61dae` passed install, TypeScript, Vitest, clean build, zero-vulnerability production audit, migration no-op and readiness before activation. Post-deploy public Playwright checks passed 9/9; the live staging database was not seeded or mutated for acceptance.
 
 ## Migration order
 
