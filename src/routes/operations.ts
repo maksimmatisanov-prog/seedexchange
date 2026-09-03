@@ -69,7 +69,8 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   app.post('/seller/shipping', async (request, reply) => {
     const user=requireUser(request); const form=z.object({csrf:z.string(),organization_id:z.coerce.string(),name:z.string().trim().min(2).max(120),countries:z.string().trim().min(1).max(500),rate:z.coerce.number().min(0).max(10000)}).parse(request.body);
     assertCsrf(request,form.csrf); await requireOrganization(user,form.organization_id);
-    await pool.query(`INSERT INTO seller_shipping_zones(organization_id,name,countries,rate_cents) VALUES($1,$2,$3,$4)`,[form.organization_id,form.name,form.countries.toUpperCase(),Math.round(form.rate*100)]);
+    const created=await pool.query<{id:string}>(`INSERT INTO seller_shipping_zones(organization_id,name,countries,rate_cents) VALUES($1,$2,$3,$4) RETURNING id`,[form.organization_id,form.name,form.countries.toUpperCase(),Math.round(form.rate*100)]);
+    await audit(user.id,'shipping_zone',created.rows[0].id,'shipping_zone.created');
     return reply.redirect(`/seller/organization/${form.organization_id}`,303);
   });
 
@@ -108,7 +109,9 @@ export async function registerOperationRoutes(app: FastifyInstance) {
 
   app.post<{Params:{id:string;action:string}}>('/admin/product/:id/:action',async(request,reply)=>{
     const user=requireRole(request,['platform_admin']); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf);
-    const action=z.enum(['approve','reject']).parse(request.params.action); await pool.query('UPDATE products SET status=$1,updated_at=now() WHERE id=$2 AND status=$3',[action==='approve'?'active':'rejected',request.params.id,'pending_review']);
-    await audit(user.id,'product',request.params.id,`product.${action}d`); return reply.redirect('/admin',303);
+    const action=z.enum(['approve','reject']).parse(request.params.action);
+    const updated=await pool.query<{id:string}>('UPDATE products SET status=$1,updated_at=now() WHERE id=$2 AND status=$3 RETURNING id',[action==='approve'?'active':'rejected',request.params.id,'pending_review']);
+    if (!updated.rows[0]) throw Object.assign(new Error('Pending product not found.'),{statusCode:404});
+    await audit(user.id,'product',request.params.id,action==='approve'?'product.approved':'product.rejected'); return reply.redirect('/admin',303);
   });
 }

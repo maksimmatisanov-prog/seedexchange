@@ -74,6 +74,9 @@ All operational package commands now compile and exist. Payment flags remain off
 - RBAC release `5ac8602` passed server-side install, TypeScript, Vitest, build, migration no-op and readiness before activation. A post-deploy audit then identified a newly disclosed moderate issue in transitive `qs` 6.15.3.
 - Follow-up release `3ca9ef0` updated only the compatible lockfile resolution to `qs` 6.16.0. Server-side install, TypeScript, Vitest, clean build, production dependency audit, migration no-op and readiness passed; `/srv/seedexchange/current` now resolves to this release.
 - Post-deploy authenticated public Playwright checks passed 9/9 against staging at 375, 768 and 1440 px. The live production dependency audit reports zero known vulnerabilities.
+- Local opt-in write acceptance now runs serially on desktop and covers invalid-CSRF rejection, seller product submission, shipping-zone creation, exchange publication and platform-admin product approval. It verifies stored integer cents, normalized country codes, workflow statuses, seller/admin audit events and public visibility after approval.
+- Shipping-zone creation now emits `shipping_zone.created`. Product moderation returns 404 when no pending row is changed and records the explicit `product.approved` or `product.rejected` event name.
+- The write acceptance passed 5/5 against an isolated PostgreSQL 14 database. Teardown returned users, organizations, products and audit events to zero before the exact temporary database was removed; staging received no fixtures.
 
 ## Migration order
 
