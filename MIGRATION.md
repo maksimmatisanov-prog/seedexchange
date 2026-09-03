@@ -50,7 +50,7 @@ All operational package commands now compile and exist. Payment flags remain off
 
 ## Staging deployment evidence from 2026-09-02
 
-- Immutable release `0aea23e` is active at `/srv/seedexchange/current` on the existing VPS. The web service listens only on `127.0.0.1:4100` and is enabled in systemd.
+- Immutable release `0aea23e` was the initial deployment at `/srv/seedexchange/current` on the existing VPS. The web service listens only on `127.0.0.1:4100` and is enabled in systemd.
 - The release archive SHA-256 was checked before activation. Server-side `npm ci`, TypeScript, Vitest and clean build passed; the run recorded 10 passing tests, one database integration test skipped without `TEST_DATABASE_URL`, and zero known npm audit findings.
 - PostgreSQL 16 database `seedexchange_staging` is owned through the isolated `seedexchange` peer-auth role. Both ordered migrations applied once, the repeat run was a no-op, and `/ready` reported migration `002_legacy_compatibility.sql`.
 - Local VPS smoke returned 200 for health, readiness, public pages, auth pages, assets, robots and sitemap; protected account, messages and admin routes returned 401 and an unknown route returned 404.
@@ -71,6 +71,9 @@ All operational package commands now compile and exist. Payment flags remain off
 - Mutating Playwright acceptance is opt-in and fails closed unless both the application and database are loopback-only, `DATABASE_URL` matches `TEST_DATABASE_URL`, and the database name ends in `_test` or `_acceptance`.
 - The isolated PostgreSQL 14 run applied both migrations and passed buyer login/logout, ordinary-member denial, seller workspace access, platform-admin denial for sellers, platform-admin dashboard access and platform-admin organization override.
 - The complete local browser run passed 13 tests at the applicable viewports with 8 intentional role-test skips on mobile/tablet. The exact temporary database `seedexchange_acceptance` was deleted after the run; no staging users or data were created.
+- RBAC release `5ac8602` passed server-side install, TypeScript, Vitest, build, migration no-op and readiness before activation. A post-deploy audit then identified a newly disclosed moderate issue in transitive `qs` 6.15.3.
+- Follow-up release `3ca9ef0` updated only the compatible lockfile resolution to `qs` 6.16.0. Server-side install, TypeScript, Vitest, clean build, production dependency audit, migration no-op and readiness passed; `/srv/seedexchange/current` now resolves to this release.
+- Post-deploy authenticated public Playwright checks passed 9/9 against staging at 375, 768 and 1440 px. The live production dependency audit reports zero known vulnerabilities.
 
 ## Migration order
 
