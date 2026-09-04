@@ -18,7 +18,7 @@ Status refresh: 2026-09-04. The local homepage redesign passes TypeScript, Vites
 - Process-only `/health`; `/ready` checks PostgreSQL and the migration version.
 - PostgreSQL sessions, CSRF, registration, email verification, password reset, throttling, RBAC, audit and PHP `$2y$` bcrypt upgrade on successful login.
 - Directory, marketplace, product, exchange, search, sitemap and canonical legacy query redirects.
-- Organization submission/moderation, Founder allocation, seller product/shipping/exchange workspace and admin queues.
+- Organization submission/moderation, Founder allocation, discovery-safe organization profile/contact/exchange workspace, commerce-gated product/shipping/order tools and admin queues.
 - Server-priced cart, seller shipping, order snapshots, seller sub-orders, reservations and disabled-by-default Stripe Checkout/webhook/transfer foundations.
 - Seller fulfilment from paid through processing, tracked shipment, buyer confirmation and delivery-case transfer holds.
 - Buyer/organization conversations, outbox delivery, reservation/transfer worker and sitemap generation.
@@ -110,6 +110,17 @@ All operational package commands now compile and exist. Payment flags remain off
 - PostgreSQL 14 applied migrations `001`–`003` on an empty temporary database and a repeat run applied zero files. The deploy verifier now also requires `/ready` to report the latest migration bundled in the release, preventing activation on an older schema.
 - A production discovery-data verifier and cutover runbook now require a successful fingerprinted discovery import, an external-only data set, disabled organization payment capabilities, completed moderation and sitemap health before DNS activation. Production service and Caddy examples use an isolated root, database environment and loopback port rather than staging state.
 - The compiled discovery-data verifier was exercised against an isolated PostgreSQL 14 database. A migration-003 dataset with a successful discovery run, verified administrator, approved organization and active HTTPS external product returned `ready: true`; inserting one shipping row changed it to `ready: false` with `Commerce tables contain rows during discovery launch.` The temporary cluster was then stopped and removed.
+
+## Discovery organization and exchange workspace from 2026-09-04
+
+- The organization workspace now matches the first launch phase: approved organizations can maintain their public profile and public contact channels, publish detailed exchange or donation listings, and mark active listings completed or withdrawn.
+- Email is normalized to a public `mailto:` link. Social and marketplace channels require HTTPS and an official service hostname; changing a saved channel resets its verification flag. Invalid public links return a user-facing 400 response.
+- Public read models revalidate stored profile, channel and exchange-contact URLs, so unsafe legacy/imported values are omitted rather than emitted into HTML.
+- Public organization pages now expose profile specialties, public contacts and the organization's active exchange/donation listings. The exchange directory exposes variety, category, origin, requested exchange and an explicit external contact path when supplied.
+- Internal marketplace product submission, shipping-zone writes, seller fulfilment and marketplace-product moderation are absent from the discovery workspace and return 404 on direct requests. Their database reads are also skipped in discovery.
+- TypeScript and Vitest passed locally. Vitest recorded 33 passing tests and one migration test skipped without `TEST_DATABASE_URL`; coverage includes URL normalization, hostile/wrong-domain rejection, public organization exchange rendering and direct discovery requests to five commerce mutation routes.
+- An isolated PostgreSQL 14 run applied migrations `001`–`003` and passed 16 browser checks: 12 public responsive/accessibility/launch-boundary checks plus buyer/member/seller RBAC and the discovery organization workflow. The workflow verified persisted profile fields, normalized channels, a public exchange listing, public rendering, withdrawal and four audit events; commerce forms stayed absent. Twenty commerce/responsive role permutations were intentionally skipped. The temporary cluster was stopped and removed.
+- This is local implementation evidence. No staging or production state was changed.
 
 ## Identity and RBAC evidence from 2026-09-03
 

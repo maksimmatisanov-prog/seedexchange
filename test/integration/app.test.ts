@@ -17,8 +17,14 @@ const query = vi.fn(async (sql: string, params?: unknown[]) => {
     }
     return { rows: [{ id: 'product-1', name: 'Arctic pea', botanical_name: 'Pisum sativum', slug: 'arctic-pea', category: 'vegetables', price_cents: '600', compare_at_price_cents: null, currency: 'USD', stock_quantity: 8, image_url: null, purchase_mode: 'external', external_purchase_url: 'https://seller.example/arctic-pea', organization_name: 'Northern Seed Library', organization_slug: 'northern-seed-library' }], rowCount: 1 };
   }
+  if (sql.includes('FROM organization_channels')) {
+    return { rows: [
+      { channel_type: 'email', label: 'Email', url: 'archive@example.test', is_verified: false },
+      { channel_type: 'telegram', label: 'Telegram', url: 'javascript:alert(1)', is_verified: true },
+    ], rowCount: 2 };
+  }
   if (sql.includes('FROM exchange_listings x JOIN organizations o')) {
-    return { rows: [{ id: 'exchange-1', title: 'Northern field pea', species: 'Pisum sativum', quantity_available: '20 packets', mode: 'exchange', description: 'Surplus from the current collection cycle.', organization_name: 'Northern Seed Library', organization_slug: 'northern-seed-library' }], rowCount: 1 };
+    return { rows: [{ id: 'exchange-1', title: 'Northern field pea', species: 'Pisum sativum', quantity_available: '20 packets', contact_url: 'javascript:alert(1)', mode: 'exchange', description: 'Surplus from the current collection cycle.', organization_name: 'Northern Seed Library', organization_slug: 'northern-seed-library' }], rowCount: 1 };
   }
   return { rows: [], rowCount: 0 };
 });
@@ -68,6 +74,21 @@ describe('public application', () => {
     expect((await app.inject({ method: 'POST', url: '/cart/add', payload: {} })).statusCode).toBe(404);
     expect((await app.inject({ method: 'POST', url: '/checkout/create', payload: {} })).statusCode).toBe(404);
     expect((await app.inject({ method: 'POST', url: '/webhook/stripe', payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: '/seller/product', payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: '/seller/shipping', payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: '/seller/order/1/processing', payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: '/seller/order/1/ship', payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: '/admin/product/1/approve', payload: {} })).statusCode).toBe(404);
+  });
+
+  it('publishes organization contacts and exchange details in discovery', async () => {
+    const response = await app.inject({ method: 'GET', url: '/directory/northern-seed-library' });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('Northern field pea');
+    expect(response.body).toContain('Exchange and donation listings');
+    expect(response.body).toContain('href="mailto:archive@example.test"');
+    expect(response.body).not.toContain('javascript:');
+    expect(response.body).not.toContain('action="/cart/add"');
   });
 
   it('keeps approved external offers visible without an internal purchase path', async () => {

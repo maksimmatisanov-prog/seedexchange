@@ -5,6 +5,8 @@ import pg from 'pg';
 const acceptanceEnabled = process.env.PLAYWRIGHT_MUTATING_ACCEPTANCE === '1';
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4000';
+const expectedLaunchPhase = process.env.PLAYWRIGHT_EXPECT_LAUNCH_PHASE ?? 'discovery';
+const commerceAcceptance = expectedLaunchPhase === 'commerce';
 const runId = randomUUID().replaceAll('-', '');
 const password = 'Acceptance-only-password-2026!';
 const passwordHash = '$2b$12$iQzAVZRdMnLVhv/exym3vu0xPp6FGBNW0yaP10TvjKgMx9ohZeFte';
@@ -102,6 +104,7 @@ test.describe('buyer, seller and administrator acceptance', () => {
     await database.query(`DELETE FROM seller_orders WHERE organization_id=$1`,[organizationId]);
     await database.query(`DELETE FROM orders WHERE email=ANY($1::text[])`,[Object.values(emails)]);
     await database.query('DELETE FROM exchange_listings WHERE organization_id=$1', [organizationId]);
+    await database.query('DELETE FROM organization_channels WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM seller_shipping_zones WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM products WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM organizations WHERE id=$1', [organizationId]);
@@ -137,6 +140,7 @@ test.describe('buyer, seller and administrator acceptance', () => {
   });
 
   test('organization administrator writes through CSRF-protected seller forms with audit events', async ({ page }) => {
+    test.skip(!commerceAcceptance, 'Marketplace product and shipping acceptance requires the commerce launch phase.');
     await login(page, emails.seller);
     await page.goto(`/seller/organization/${organizationId}`);
 
@@ -172,7 +176,8 @@ test.describe('buyer, seller and administrator acceptance', () => {
     await exchangeForm.getByLabel('Mode').selectOption('exchange');
     await exchangeForm.getByLabel('Title').fill(exchangeTitle);
     await exchangeForm.getByLabel('Species').fill('Phaseolus vulgaris');
-    await exchangeForm.getByLabel('Quantity').fill('5 packets');
+    await exchangeForm.getByLabel('Quantity available').fill('5 packets');
+    await exchangeForm.getByLabel('Public contact URL').fill(`https://example.test/contact/${runId}`);
     await exchangeForm.getByLabel('Description').fill('Acceptance-only exchange listing created by the isolated test suite.');
     await exchangeForm.getByRole('button', { name: 'Publish listing' }).click();
 
@@ -188,6 +193,7 @@ test.describe('buyer, seller and administrator acceptance', () => {
   });
 
   test('platform administrator moderates the seller product and can enter any seller workspace', async ({ page }) => {
+    test.skip(!commerceAcceptance, 'Marketplace product moderation acceptance requires the commerce launch phase.');
     await login(page, emails.admin);
     await page.goto('/admin');
     await expect(page.getByRole('heading', { name: 'Platform administration' })).toBeVisible();
@@ -203,6 +209,7 @@ test.describe('buyer, seller and administrator acceptance', () => {
   });
 
   test('seller ships a paid order and the buyer confirms delivery',async({page})=>{
+    test.skip(!commerceAcceptance, 'Seller fulfilment acceptance requires the commerce launch phase.');
     const {orderId,sellerOrderId}=await createPaidOrder();
     await login(page,emails.seller); await page.goto(`/seller/organization/${organizationId}`);
     const rejected=await page.context().request.post(`/seller/order/${sellerOrderId}/processing`,{form:{csrf:'invalid'}});
@@ -234,6 +241,7 @@ test.describe('buyer, seller and administrator acceptance', () => {
   });
 
   test('buyer opens a delivery case and confirmation remains blocked',async({page})=>{
+    test.skip(!commerceAcceptance, 'Delivery-case acceptance requires the commerce launch phase.');
     const {orderId,sellerOrderId}=await createPaidOrder();
     await database.query(`UPDATE seller_orders SET status='shipped',shipped_at=now(),delivery_due_at=now()+interval '30 days' WHERE id=$1`,[sellerOrderId]);
     await database.query(`UPDATE orders SET status='partially_fulfilled' WHERE id=$1`,[orderId]);
@@ -250,5 +258,59 @@ test.describe('buyer, seller and administrator acceptance', () => {
     const csrf=await page.locator('input[name="csrf"]').first().inputValue();
     const confirmation=await page.context().request.post(`/account/orders/${orderId}/seller/${sellerOrderId}/confirm-delivery`,{form:{csrf}});
     expect(confirmation.status()).toBe(409);
+  });
+
+  test('discovery organization administrator maintains its public profile, channels and exchanges without commerce tools', async ({ page }) => {
+    test.skip(commerceAcceptance, 'Discovery-only organization acceptance does not run in the commerce launch phase.');
+    await login(page, emails.seller);
+    await page.goto(`/seller/organization/${organizationId}`);
+    await expect(page.locator('form[action="/seller/product"]')).toHaveCount(0);
+    await expect(page.locator('form[action="/seller/shipping"]')).toHaveCount(0);
+
+    const profile = page.locator(`form[action="/seller/organization/${organizationId}/profile"]`);
+    await profile.getByLabel('Country', { exact: true }).fill('Finland');
+    await profile.getByLabel('Two-letter country code').fill('fi');
+    await profile.getByLabel('Region').fill('Lapland');
+    await profile.getByLabel('Description').fill('Acceptance organization documenting cold-climate seed accessions for public discovery.');
+    await profile.getByLabel('Specialties').fill('Cold-hardy legumes and northern landraces');
+    await profile.getByLabel('Public contact URL').fill(`https://example.test/contact/${runId}`);
+    await profile.getByLabel('Website URL').fill(`https://example.test/archive/${runId}`);
+    await profile.getByRole('button', { name: 'Save profile' }).click();
+
+    const channels = page.locator(`form[action="/seller/organization/${organizationId}/channels"]`);
+    await channels.getByLabel('Email').fill(`archive-${runId}@example.test`);
+    await channels.getByLabel('Telegram').fill(`https://t.me/archive_${runId}`);
+    await channels.getByRole('button', { name: 'Save contact channels' }).click();
+
+    const exchangeTitle = `Discovery exchange ${runId}`;
+    const exchange = page.locator('form[action="/seller/exchange"]');
+    await exchange.getByLabel('Mode').selectOption('exchange');
+    await exchange.getByLabel('Title').fill(exchangeTitle);
+    await exchange.getByLabel('Species').fill('Pisum sativum');
+    await exchange.getByLabel('Variety').fill('Northern archive line');
+    await exchange.getByLabel('Category').fill('Legumes');
+    await exchange.getByLabel('Origin country').fill('Finland');
+    await exchange.getByLabel('Quantity available').fill('5 packets');
+    await exchange.getByLabel('What you want in exchange').fill('Documented cold-climate beans');
+    await exchange.getByLabel('Description').fill('Acceptance-only exchange listing for the discovery launch workflow.');
+    await exchange.getByRole('button', { name: 'Publish listing' }).click();
+
+    const organization = await database.query<{country:string;country_code:string;region:string;contact_url:string}>(
+      'SELECT country,country_code,region,contact_url FROM organizations WHERE id=$1', [organizationId]);
+    expect(organization.rows[0]).toMatchObject({ country: 'Finland', country_code: 'FI', region: 'Lapland', contact_url: `https://example.test/contact/${runId}` });
+    expect((await database.query('SELECT 1 FROM organization_channels WHERE organization_id=$1 AND channel_type=$2 AND url=$3', [organizationId, 'email', `mailto:archive-${runId}@example.test`])).rowCount).toBe(1);
+    const listing = await database.query<{id:string;contact_url:string;status:string}>('SELECT id,contact_url,status FROM exchange_listings WHERE organization_id=$1 AND title=$2', [organizationId, exchangeTitle]);
+    expect(listing.rows[0]).toMatchObject({ contact_url: `https://example.test/contact/${runId}`, status: 'active' });
+
+    await page.goto(`/directory/acceptance-grower-${runId}`);
+    await expect(page.locator('main')).toContainText(exchangeTitle);
+    await expect(page.locator('main')).toContainText('Cold-hardy legumes and northern landraces');
+    await expect(page.locator(`a[href="mailto:archive-${runId}@example.test"]`)).toBeVisible();
+
+    await page.goto(`/seller/organization/${organizationId}`);
+    const article = page.locator('article').filter({ hasText: exchangeTitle });
+    await article.getByRole('button', { name: 'Withdraw' }).click();
+    expect((await database.query<{status:string}>('SELECT status FROM exchange_listings WHERE id=$1', [listing.rows[0].id])).rows[0].status).toBe('withdrawn');
+    expect((await database.query(`SELECT 1 FROM audit_events WHERE actor_user_id=$1 AND event_name=ANY($2::text[])`, [sellerUserId, ['organization.profile_updated','organization.channels_updated','exchange.published','exchange.withdrawn']])).rowCount).toBe(4);
   });
 });

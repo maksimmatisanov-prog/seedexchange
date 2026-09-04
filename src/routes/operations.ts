@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { config } from '../config.js';
 import { pool } from '../db/pool.js';
+import { ORGANIZATION_CHANNELS, ORGANIZATION_CHANNEL_LABELS, normalizeOrganizationChannel, normalizePublicHttpUrl } from '../domain/organization.js';
 import { canManageOrganization, canTransitionSellerOrder } from '../domain/rules.js';
 import { pageModel } from '../lib/view.js';
 import { audit } from '../services/audit.js';
@@ -9,6 +11,9 @@ import { assertCsrf, requireRole, requireUser } from '../services/sessions.js';
 import type { CurrentUser } from '../types/fastify.js';
 
 const slugify = (value: string) => value.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 180);
+function requireCommerceLaunch(): void {
+  if (!config.COMMERCE_ENABLED) throw Object.assign(new Error('This commerce operation is unavailable during the discovery launch.'), { statusCode: 404 });
+}
 async function requireOrganization(user: CurrentUser, organizationId: string) {
   const result = await pool.query(`SELECT o.*,m.role member_role FROM organizations o
     LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=$2
@@ -43,16 +48,50 @@ export async function registerOperationRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { id: string } }>('/seller/organization/:id', async (request, reply) => {
     const user = requireUser(request); const organization = await requireOrganization(user, request.params.id);
-    const [products,zones,exchanges,orders] = await Promise.all([
-      pool.query('SELECT * FROM products WHERE organization_id=$1 ORDER BY updated_at DESC', [organization.id]),
-      pool.query('SELECT * FROM seller_shipping_zones WHERE organization_id=$1 ORDER BY id DESC', [organization.id]),
+    const [products,zones,exchanges,orders,channels] = await Promise.all([
+      config.COMMERCE_ENABLED ? pool.query('SELECT * FROM products WHERE organization_id=$1 AND purchase_mode=$2 ORDER BY updated_at DESC', [organization.id, 'marketplace']) : Promise.resolve({ rows: [] }),
+      config.COMMERCE_ENABLED ? pool.query('SELECT * FROM seller_shipping_zones WHERE organization_id=$1 ORDER BY id DESC', [organization.id]) : Promise.resolve({ rows: [] }),
       pool.query('SELECT * FROM exchange_listings WHERE organization_id=$1 ORDER BY id DESC', [organization.id]),
-      pool.query('SELECT * FROM seller_orders WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 50', [organization.id]),
+      config.COMMERCE_ENABLED ? pool.query('SELECT * FROM seller_orders WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 50', [organization.id]) : Promise.resolve({ rows: [] }),
+      pool.query<{channel_type:string;url:string}>('SELECT channel_type,url FROM organization_channels WHERE organization_id=$1 ORDER BY channel_type', [organization.id]),
     ]);
-    return reply.view('pages/account/seller.ejs', pageModel(request, { title: `${organization.name} workspace`, description: 'Seller and organization workspace.', canonical: null, organization, products: products.rows, zones: zones.rows, exchanges: exchanges.rows, orders: orders.rows }));
+    const channelValues = Object.fromEntries(channels.rows.map((channel) => [channel.channel_type, channel.channel_type === 'email' ? channel.url.replace(/^mailto:/i, '') : channel.url]));
+    return reply.view('pages/account/seller.ejs', pageModel(request, { title: `${organization.name} workspace`, description: 'Organization workspace.', canonical: null, organization, products: products.rows, zones: zones.rows, exchanges: exchanges.rows, orders: orders.rows, channels: channelValues, organizationChannelLabels: ORGANIZATION_CHANNEL_LABELS, commerceEnabled: config.COMMERCE_ENABLED }));
+  });
+
+  app.post<{ Params: { id: string } }>('/seller/organization/:id/profile', async (request, reply) => {
+    const user=requireUser(request);
+    const form=z.object({csrf:z.string(),name:z.string().trim().min(2).max(190),country:z.string().trim().min(2).max(100),country_code:z.string().trim().regex(/^$|^[A-Za-z]{2}$/),region:z.string().trim().max(190).default(''),description:z.string().trim().min(30).max(5000),specialties:z.string().trim().max(5000).default(''),contact_url:z.string().trim().max(500).default(''),website_url:z.string().trim().max(500).default('')}).parse(request.body);
+    assertCsrf(request,form.csrf); await requireOrganization(user,request.params.id);
+    const contactUrl=normalizePublicHttpUrl(form.contact_url); const websiteUrl=normalizePublicHttpUrl(form.website_url);
+    const updated=await pool.query(`UPDATE organizations SET name=$1,country=$2,country_code=$3,region=$4,description=$5,specialties=$6,
+      contact_url=$7,website_url=$8,profile_updated_at=now() WHERE id=$9 RETURNING id`,
+    [form.name,form.country,form.country_code.toUpperCase()||null,form.region||null,form.description,form.specialties||null,contactUrl,websiteUrl,request.params.id]);
+    if(!updated.rows[0])throw Object.assign(new Error('Organization not found.'),{statusCode:404});
+    await audit(user.id,'organization',request.params.id,'organization.profile_updated');
+    return reply.redirect(`/seller/organization/${request.params.id}#profile`,303);
+  });
+
+  app.post<{ Params: { id: string } }>('/seller/organization/:id/channels', async (request, reply) => {
+    const user=requireUser(request); const body=z.record(z.string(),z.unknown()).parse(request.body); assertCsrf(request,String(body.csrf??'')); await requireOrganization(user,request.params.id);
+    const client=await pool.connect();
+    try{await client.query('BEGIN');
+      for(const type of ORGANIZATION_CHANNELS){
+        const url=normalizeOrganizationChannel(type,String(body[`channel_${type}`]??''));
+        if(!url){await client.query('DELETE FROM organization_channels WHERE organization_id=$1 AND channel_type=$2',[request.params.id,type]);continue;}
+        await client.query(`INSERT INTO organization_channels(organization_id,channel_type,label,url) VALUES($1,$2,$3,$4)
+          ON CONFLICT(organization_id,channel_type) DO UPDATE SET label=EXCLUDED.label,
+          is_verified=CASE WHEN organization_channels.url=EXCLUDED.url THEN organization_channels.is_verified ELSE false END,
+          url=EXCLUDED.url,updated_at=now()`,[request.params.id,type,ORGANIZATION_CHANNEL_LABELS[type],url]);
+      }
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    await audit(user.id,'organization',request.params.id,'organization.channels_updated');
+    return reply.redirect(`/seller/organization/${request.params.id}#channels`,303);
   });
 
   app.post('/seller/product', async (request, reply) => {
+    requireCommerceLaunch();
     const user = requireUser(request);
     const form = z.object({ csrf:z.string(), organization_id:z.coerce.string(), product_id:z.coerce.string().optional(), name:z.string().trim().min(2).max(255), sku:z.string().trim().min(1).max(100), botanical_name:z.string().trim().max(255).default(''), category:z.string().trim().max(100).default(''), description:z.string().trim().min(20).max(10000), price:z.coerce.number().min(.5).max(100000), stock_quantity:z.coerce.number().int().min(0).max(1_000_000), packet_quantity:z.string().trim().max(120).default('') }).parse(request.body);
     assertCsrf(request,form.csrf); await requireOrganization(user,form.organization_id);
@@ -68,6 +107,7 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   });
 
   app.post('/seller/shipping', async (request, reply) => {
+    requireCommerceLaunch();
     const user=requireUser(request); const form=z.object({csrf:z.string(),organization_id:z.coerce.string(),name:z.string().trim().min(2).max(120),countries:z.string().trim().min(1).max(500),rate:z.coerce.number().min(0).max(10000)}).parse(request.body);
     assertCsrf(request,form.csrf); await requireOrganization(user,form.organization_id);
     const created=await pool.query<{id:string}>(`INSERT INTO seller_shipping_zones(organization_id,name,countries,rate_cents) VALUES($1,$2,$3,$4) RETURNING id`,[form.organization_id,form.name,form.countries.toUpperCase(),Math.round(form.rate*100)]);
@@ -76,14 +116,32 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   });
 
   app.post('/seller/exchange', async (request, reply) => {
-    const user=requireUser(request); const form=z.object({csrf:z.string(),organization_id:z.coerce.string(),mode:z.enum(['exchange','donate']),title:z.string().trim().min(2).max(255),species:z.string().trim().max(255).default(''),quantity_available:z.string().trim().max(120).default(''),description:z.string().trim().min(20).max(5000)}).parse(request.body);
-    assertCsrf(request,form.csrf); await requireOrganization(user,form.organization_id);
-    const created=await pool.query<{id:string}>(`INSERT INTO exchange_listings(organization_id,mode,title,species,quantity_available,description) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[form.organization_id,form.mode,form.title,form.species||null,form.quantity_available||null,form.description]);
+    const user=requireUser(request); const form=z.object({csrf:z.string(),organization_id:z.coerce.string(),mode:z.enum(['exchange','donate']),title:z.string().trim().min(2).max(255),species:z.string().trim().min(2).max(255),variety:z.string().trim().max(255).default(''),category:z.string().trim().max(100).default(''),origin_country:z.string().trim().max(100).default(''),quantity_available:z.string().trim().min(1).max(120),wants:z.string().trim().max(2000).default(''),contact_url:z.string().trim().max(500).default(''),description:z.string().trim().min(20).max(5000)}).parse(request.body);
+    assertCsrf(request,form.csrf); const organization=await requireOrganization(user,form.organization_id);
+    if(organization.status!=='approved')throw Object.assign(new Error('Your organization must be approved before publishing an exchange.'),{statusCode:409});
+    const contactUrl=normalizePublicHttpUrl(form.contact_url||String(organization.contact_url??''),true);
+    const created=await pool.query<{id:string}>(`INSERT INTO exchange_listings(organization_id,mode,title,species,variety,category,origin_country,quantity_available,wants,contact_url,description)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,[form.organization_id,form.mode,form.title,form.species,form.variety||null,form.category||null,form.origin_country||null,form.quantity_available,form.wants||null,contactUrl,form.description]);
     await audit(user.id,'exchange',created.rows[0].id,'exchange.published');
     return reply.redirect(`/seller/organization/${form.organization_id}`,303);
   });
 
+  app.post<{Params:{id:string;action:string}}>('/seller/exchange/:id/:action',async(request,reply)=>{
+    const user=requireUser(request); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf); const action=z.enum(['complete','withdraw']).parse(request.params.action);
+    const listing=await pool.query<{organization_id:string;status:string}>('SELECT organization_id,status FROM exchange_listings WHERE id=$1',[request.params.id]);
+    if(!listing.rows[0])throw Object.assign(new Error('Exchange listing not found.'),{statusCode:404});
+    await requireOrganization(user,listing.rows[0].organization_id);
+    if(listing.rows[0].status!=='active')throw Object.assign(new Error('Exchange listing is no longer active.'),{statusCode:409});
+    const status=action==='complete'?'completed':'withdrawn';
+    const updated=await pool.query(`UPDATE exchange_listings SET status=$1,completed_at=CASE WHEN $1='completed' THEN now() ELSE completed_at END
+      WHERE id=$2 AND status='active' RETURNING id`,[status,request.params.id]);
+    if(!updated.rows[0])throw Object.assign(new Error('Exchange listing changed while it was being updated.'),{statusCode:409});
+    await audit(user.id,'exchange',request.params.id,action==='complete'?'exchange.completed':'exchange.withdrawn');
+    return reply.redirect(`/seller/organization/${listing.rows[0].organization_id}#exchange`,303);
+  });
+
   app.post<{Params:{id:string}}>('/seller/order/:id/processing',async(request,reply)=>{
+    requireCommerceLaunch();
     const user=requireUser(request); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf);
     const sellerOrder=await pool.query<{organization_id:string;status:string}>('SELECT organization_id,status FROM seller_orders WHERE id=$1',[request.params.id]);
     if(!sellerOrder.rows[0])throw Object.assign(new Error('Seller order not found.'),{statusCode:404});
@@ -96,6 +154,7 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   });
 
   app.post<{Params:{id:string}}>('/seller/order/:id/ship',async(request,reply)=>{
+    requireCommerceLaunch();
     const user=requireUser(request); const form=z.object({csrf:z.string(),carrier:z.string().trim().min(2).max(120),tracking_number:z.string().trim().min(2).max(190),tracking_url:z.union([z.literal(''),z.string().url().max(500)]).default('')}).parse(request.body); assertCsrf(request,form.csrf);
     const sellerOrder=await pool.query<{organization_id:string;status:string;order_id:string}>('SELECT organization_id,status,order_id FROM seller_orders WHERE id=$1',[request.params.id]);
     if(!sellerOrder.rows[0])throw Object.assign(new Error('Seller order not found.'),{statusCode:404});
@@ -119,7 +178,7 @@ export async function registerOperationRoutes(app: FastifyInstance) {
     requireRole(request,['platform_admin']);
     const [organizations,products,cases,reports,batches]=await Promise.all([
       pool.query(`SELECT * FROM organizations WHERE status IN ('pending','info_requested') ORDER BY created_at`),
-      pool.query(`SELECT p.*,o.name organization_name FROM products p JOIN organizations o ON o.id=p.organization_id WHERE p.status='pending_review' AND p.publication_batch_id IS NULL ORDER BY p.updated_at`),
+      config.COMMERCE_ENABLED ? pool.query(`SELECT p.*,o.name organization_name FROM products p JOIN organizations o ON o.id=p.organization_id WHERE p.status='pending_review' AND p.purchase_mode='marketplace' AND p.publication_batch_id IS NULL ORDER BY p.updated_at`) : Promise.resolve({rows:[]}),
       pool.query(`SELECT * FROM delivery_cases WHERE status IN ('open','reviewing') ORDER BY created_at`),
       pool.query(`SELECT * FROM reports WHERE status IN ('open','reviewing') ORDER BY created_at`),
       pool.query(`SELECT b.*,o.name organization_name FROM supplier_publication_batches b JOIN organizations o ON o.id=b.organization_id WHERE b.status='pending_review' ORDER BY b.created_at`),
@@ -141,6 +200,7 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   });
 
   app.post<{Params:{id:string;action:string}}>('/admin/product/:id/:action',async(request,reply)=>{
+    requireCommerceLaunch();
     const user=requireRole(request,['platform_admin']); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf);
     const action=z.enum(['approve','reject']).parse(request.params.action);
     const updated=await pool.query<{id:string}>('UPDATE products SET status=$1,updated_at=now() WHERE id=$2 AND status=$3 RETURNING id',[action==='approve'?'active':'rejected',request.params.id,'pending_review']);

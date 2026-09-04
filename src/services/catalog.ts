@@ -1,9 +1,23 @@
 import { config } from '../config.js';
 import { pool } from '../db/pool.js';
+import { ORGANIZATION_CHANNELS, normalizeOrganizationChannel, normalizePublicHttpUrl, type OrganizationChannel } from '../domain/organization.js';
 
 export type OrganizationCard = { id: string; name: string; slug: string; type: string; country: string; description: string; specialties: string | null; founder_slot: number | null };
 export type ProductCard = { id: string; name: string; botanical_name: string | null; slug: string; category: string | null; price_cents: string; compare_at_price_cents: string | null; currency: string; stock_quantity: number; image_url: string | null; purchase_mode: string; external_purchase_url: string | null; organization_name: string; organization_slug: string };
-export type ExchangeCard = { id: string; title: string; species: string | null; quantity_available: string | null; mode: string; description: string; organization_name: string; organization_slug: string };
+export type ExchangeCard = { id: string; title: string; species: string | null; variety: string | null; category: string | null; origin_country: string | null; quantity_available: string | null; wants: string | null; contact_url: string | null; mode: string; description: string; organization_name: string; organization_slug: string };
+
+function safePublicUrl(value: unknown): string | null {
+  try { return normalizePublicHttpUrl(typeof value === 'string' ? value : ''); }
+  catch { return null; }
+}
+
+function safeChannel(channel: { channel_type: string; label: string; url: string; is_verified: boolean }) {
+  if (!ORGANIZATION_CHANNELS.includes(channel.channel_type as OrganizationChannel)) return null;
+  try { return { ...channel, url: normalizeOrganizationChannel(channel.channel_type as OrganizationChannel, channel.url)! }; }
+  catch { return null; }
+}
+
+const safeExchange = (exchange: ExchangeCard): ExchangeCard => ({ ...exchange, contact_url: safePublicUrl(exchange.contact_url) });
 
 export async function homeModel() {
   const [counts, organizations, products, exchanges] = await Promise.all([
@@ -29,8 +43,14 @@ export async function getOrganization(slug: string) {
     FROM organizations o LEFT JOIN founder_program_members f ON f.organization_id=o.id AND f.status<>'revoked'
     WHERE o.slug=$1 AND o.status='approved'`, [slug, config.PUBLIC_PRODUCT_MODES]);
   if (!result.rows[0]) return null;
-  const products = await listProducts({ organizationId: result.rows[0].id, limit: 24 });
-  return { ...result.rows[0], products };
+  const [products, channels, exchanges] = await Promise.all([
+    listProducts({ organizationId: result.rows[0].id, limit: 24 }),
+    pool.query<{ channel_type: string; label: string; url: string; is_verified: boolean }>('SELECT channel_type,label,url,is_verified FROM organization_channels WHERE organization_id=$1 ORDER BY channel_type', [result.rows[0].id]),
+    pool.query<ExchangeCard>(`SELECT x.id,x.title,x.species,x.variety,x.category,x.origin_country,x.quantity_available,x.wants,x.contact_url,x.mode,x.description,
+      o.name organization_name,o.slug organization_slug FROM exchange_listings x JOIN organizations o ON o.id=x.organization_id
+      WHERE x.organization_id=$1 AND x.status='active' ORDER BY x.created_at DESC`, [result.rows[0].id]),
+  ]);
+  return { ...result.rows[0], contact_url: safePublicUrl(result.rows[0].contact_url), website_url: safePublicUrl(result.rows[0].website_url), products, channels: channels.rows.map(safeChannel).filter((channel) => channel !== null), exchanges: exchanges.rows.map(safeExchange) };
 }
 
 export async function listProducts(options: { q?: string; category?: string; organizationId?: string; limit?: number } = {}): Promise<ProductCard[]> {
@@ -59,8 +79,8 @@ export async function getProduct(slug: string) {
 }
 
 export async function listExchanges(limit = 48): Promise<ExchangeCard[]> {
-  const result = await pool.query<ExchangeCard>(`SELECT x.id,x.title,x.species,x.quantity_available,x.mode,x.description,
+  const result = await pool.query<ExchangeCard>(`SELECT x.id,x.title,x.species,x.variety,x.category,x.origin_country,x.quantity_available,x.wants,x.contact_url,x.mode,x.description,
     o.name organization_name,o.slug organization_slug FROM exchange_listings x JOIN organizations o ON o.id=x.organization_id
     WHERE x.status='active' AND o.status='approved' ORDER BY x.created_at DESC LIMIT $1`, [limit]);
-  return result.rows;
+  return result.rows.map(safeExchange);
 }
