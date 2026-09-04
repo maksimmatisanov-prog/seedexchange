@@ -60,11 +60,11 @@ This is not approved for production cutover. `MIGRATION.md` is the source of tru
 
 As of 2026-09-04:
 
-- The working branch is `codex/discovery-launch`; including this status update, it contains 34 local commits beyond `origin/master` and has not been pushed. The latest application change is `4676b5c`.
-- Local TypeScript, the clean build and 96 Vitest checks pass. One PostgreSQL-backed migration test is skipped when `TEST_DATABASE_URL` is not configured. Chromium public acceptance most recently passed 13 checks with two deliberate duplicate-viewport skips.
+- The working branch is `codex/discovery-launch` and has not been pushed. The latest application change is `4676b5c`; later local commits update operational evidence and gates only.
+- Local TypeScript, the clean build and 100 Vitest checks pass. One PostgreSQL-backed migration test is skipped when `TEST_DATABASE_URL` is not configured. Chromium public acceptance most recently passed 13 checks with two deliberate duplicate-viewport skips.
 - The immutable discovery release manifest verifies 302 allowlisted files, pins migration `003_discovery_migration_scope.sql` and contains no runtime `node_modules`.
 - Read-only public checks still identify the Hostinger PHP application. DNS still resolves through the existing Hostinger/CDN addresses, not the intended VPS cutover address.
-- Read-only VPS preflight confirms Node 24, the `seedexchange` service account, active PostgreSQL and Caddy, the existing isolated staging root `/srv/seedexchange`, and a free production loopback port `4200`.
+- The repository includes a read-only host preflight for the clean, foundation and units-installed stages. Its current VPS `--expect=clean` run returned `ready=true`, confirming Node 24, the `seedexchange` service account, active PostgreSQL and Caddy, the existing isolated staging root `/srv/seedexchange`, a valid Caddy site import and a free production loopback port `4200`.
 - The dedicated production root `/srv/seedexchange-production`, PostgreSQL database/role `seedexchange_production`, private production environment and all five production systemd units do not yet exist. No production preparation has started.
 - No production database, files, services, Caddy configuration, DNS, traffic, payment flags or marketplace state were changed while producing this snapshot.
 
@@ -82,7 +82,7 @@ These are owner and legal decisions. Code must implement the approved policy rat
 
 ## Recommended work order
 
-1. Review the 34 local discovery commits and explicitly approve `git push origin codex/discovery-launch`. A push publishes code only; it does not deploy or change production.
+1. Review the local discovery branch and explicitly approve `git push origin codex/discovery-launch`. A push publishes code only; it does not deploy or change production.
 2. After CI succeeds and a reviewed commit is merged to `master`, deploy that immutable discovery release to the closed staging endpoint, configure persistent media storage and repeat public, RBAC, organization, exchange and upload acceptance.
 3. Take a fresh read-only legacy production inventory and approve the field-by-field discovery import contract.
 4. Run two complete production-snapshot discovery migration rehearsals, save two inventory and two dry-run reports with distinct run IDs, pass the offline rehearsal verifier, and include database parity, media manifests/SHA-256, sitemap output and restore evidence.

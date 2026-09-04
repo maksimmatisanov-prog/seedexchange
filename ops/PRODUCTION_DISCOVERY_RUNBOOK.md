@@ -13,17 +13,24 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 
 ## 1. Read-only inventory
 
-1. Record the current production origin, DNS A/AAAA/CNAME values and TTL, PHP release identifier, MySQL version and migration ledger.
-2. Run the legacy production audit and record only sanitized counts and status flags.
-3. Run the compiled Node inventory twice against the same read-only MySQL snapshot:
+1. From the exact reviewed checkout, verify that the VPS is still a clean isolated target:
+
+   ```bash
+   ssh root@<approved-vps-ip> 'bash -s -- --expect=clean' < ops/verify-production-host.sh
+   ```
+
+   Require `ready=true`. The preflight is read-only and checks Node 24, the service account, PostgreSQL, Caddy import, staging isolation, port `4200`, the dedicated database/role and the exact five production units. An unexpected production resource or a missing prerequisite blocks preparation; do not repair it inside the inventory step.
+2. Record the current production origin, DNS A/AAAA/CNAME values and TTL, PHP release identifier, MySQL version and migration ledger.
+3. Run the legacy production audit and record only sanitized counts and status flags.
+4. Run the compiled Node inventory twice against the same read-only MySQL snapshot:
 
    ```bash
    npm run migrate-legacy -- --inventory --scope=discovery --output=/secure/inventory-1.json
    npm run migrate-legacy -- --inventory --scope=discovery --output=/secure/inventory-2.json
    ```
 
-4. Confirm both outputs report `sourceSnapshot=repeatable-read-read-only`. Require equal ordered column lists, per-table counts, checksums and the combined `sourceFingerprint`. A missing required table/column or any drift blocks the run before creating a backup.
-5. Record approved organizations, verified administrators, active exchanges, active external products, media rows/files, open supplier batches and failed sitemap batches.
+5. Confirm both outputs report `sourceSnapshot=repeatable-read-read-only`. Require equal ordered column lists, per-table counts, checksums and the combined `sourceFingerprint`. A missing required table/column or any drift blocks the run before creating a backup.
+6. Record approved organizations, verified administrators, active exchanges, active external products, media rows/files, open supplier batches and failed sitemap batches.
 
 ## 2. Recoverable backup
 
@@ -50,6 +57,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 2. Copy `ops/production.env.example` to `shared/production.env`, replace every placeholder privately and restrict it to the service account. Use the dedicated `seedexchange_production` PostgreSQL database and a non-superuser local role; never retain `LEGACY_MYSQL_URL` or Stripe secrets in the runtime file. Validate it before service installation:
 
    ```bash
+   ssh root@<approved-vps-ip> 'bash -s -- --expect=foundation' < ops/verify-production-host.sh
    npm run verify:production-env -- --file=/srv/seedexchange-production/shared/production.env
    ```
 
@@ -101,7 +109,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 
 ## 5. Private runtime acceptance
 
-1. After explicit unit-install approval, copy the five exact files from the prepared release's `ops/systemd/production/` directory to `/etc/systemd/system/`, preserving their names and mode `0644`. Run `systemd-analyze verify` on all five installed files, then `systemctl daemon-reload`. Keep the web service and both timers stopped. The bundle contains only the production web service, outbox delivery and sitemap generation; there is deliberately no production marketplace worker. Record one approved organization slug, external product slug and first-party media key from the verified migration. Activation rejects modified unit files and any systemd drop-ins.
+1. After explicit unit-install approval, copy the five exact files from the prepared release's `ops/systemd/production/` directory to `/etc/systemd/system/`, preserving their names and mode `0644`. Run `systemd-analyze verify` on all five installed files, then `systemctl daemon-reload`. Keep the web service and both timers stopped. From the reviewed workstation checkout, run `ssh root@<approved-vps-ip> 'bash -s -- --expect=units-installed' < ops/verify-production-host.sh` and require `ready=true`. The bundle contains only the production web service, outbox delivery and sitemap generation; there is deliberately no production marketplace worker. Record one approved organization slug, external product slug and first-party media key from the verified migration. Activation rejects modified unit files and any systemd drop-ins.
 2. After separate explicit activation approval, activate only the prepared commit. The command re-verifies the release, environment, source media manifest and discovery database before switching `current`; after restart it requires readiness plus the full read-only runtime gate. A failed restart or gate restores the previous application symlink and service (or stops the first deployment):
 
    ```bash
