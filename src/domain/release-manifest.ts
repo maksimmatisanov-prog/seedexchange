@@ -63,6 +63,7 @@ const requiredFiles = [
   'dist/scripts/verify-production-environment.js',
   'dist/scripts/verify-production-mail.js',
   'dist/scripts/verify-production-observation.js',
+  'dist/scripts/verify-public-cutover.js',
   'dist/scripts/verify-release-manifest.js',
   'dist/scripts/verify-ready.js',
   'dist/scripts/verify-discovery-runtime.js',

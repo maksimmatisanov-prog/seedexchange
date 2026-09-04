@@ -8,6 +8,8 @@ describe('production discovery Caddy bundle', () => {
     const example = await readFile(path.resolve('ops/Caddyfile.production.example'), 'utf8');
     expect(example).toBe(fragment);
     expect(fragment).toContain('www.seedexchange.online {');
+    expect(fragment).toContain('Strict-Transport-Security "max-age=31536000; includeSubDomains"');
+    expect(fragment).toContain('X-Content-Type-Options "nosniff"');
     expect(fragment).toContain('redir https://seedexchange.online{uri} permanent');
     expect(fragment).toContain('seedexchange.online {');
     expect(fragment).toContain('reverse_proxy 127.0.0.1:4200');

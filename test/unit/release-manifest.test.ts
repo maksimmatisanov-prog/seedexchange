@@ -20,6 +20,7 @@ async function createReleaseRoot(): Promise<string> {
     'dist/scripts/verify-production-environment.js': 'export {};',
     'dist/scripts/verify-production-mail.js': 'export {};',
     'dist/scripts/verify-production-observation.js': 'export {};',
+    'dist/scripts/verify-public-cutover.js': 'export {};',
     'dist/scripts/verify-release-manifest.js': 'export {};',
     'dist/scripts/verify-ready.js': 'export {};',
     'dist/scripts/verify-discovery-runtime.js': 'export {};',

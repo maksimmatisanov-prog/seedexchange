@@ -121,8 +121,14 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    SEEDX_PRODUCTION_CADDY_APPROVED=YES bash /srv/seedexchange-production/current/ops/caddy/activate-production-caddy.sh <40-char-commit> 003_discovery_migration_scope.sql /directory/<slug> /product/<slug>
    ```
 
-3. After separate DNS approval, change root and `www` DNS to the recorded VPS address. Hostinger and hPanel operations are Chrome-only. Do not remove or modify the legacy PHP release, MySQL database or uploads.
-4. Verify authoritative DNS, TLS, the `www` redirect, canonical URLs, live pages, external links, sitemap, logs and the discovery capability report from at least two external resolvers.
+3. After separate DNS approval, change root and `www` A records to the recorded VPS address. The pre-cutover zone currently also resolves AAAA records: replace them with one explicitly approved VPS IPv6 address or remove them as part of the same approved change; never leave legacy IPv6 answers active beside the new A record. Hostinger and hPanel operations are Chrome-only. Do not remove or modify the legacy PHP release, MySQL database or uploads.
+4. Run the sanitized public cutover verifier using the approved VPS address and representative paths. Omit `--expected-ipv6` only when the approved zone intentionally has no AAAA records; otherwise pass the single approved public IPv6 address:
+
+   ```bash
+   npm run verify:public-cutover -- --expected-ipv4=<approved-vps-ip> --migration=003_discovery_migration_scope.sql --organization=/directory/<slug> --product=/product/<slug> --media=/media/<key>.webp --output=/secure/public-cutover-<timestamp>.json
+   ```
+
+   It requires exact A/AAAA results for root and `www` through Cloudflare and Google DNS, valid TLS 1.2/1.3, the canonical `www` redirect, discovery-only health/readiness, the approved migration, representative organization/product/media/sitemap output and a public 404 for `/cart`. It sends only GET requests and records no bodies. Record the report SHA-256, then separately run public Playwright, inspect external offer destinations and review Caddy/application logs.
 5. If a blocking fault appears, restore the recorded Hostinger DNS values first and wait until the selected authoritative/external resolvers return the legacy values. After separate Caddy-rollback approval, remove only the exact release-matched production fragment; the rollback script restores it if the remaining shared Caddy configuration cannot validate or reload:
 
    ```bash
