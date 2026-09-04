@@ -14,5 +14,6 @@ describe('legacy Hostinger discovery routes', () => {
     expect(legacyIndexRedirectTarget(new URLSearchParams('_route=%2Fauth%2Fverify&_route=%2Fadmin'))).toBeNull();
     expect(legacyIndexRedirectTarget(new URLSearchParams('_route=https%3A%2F%2Fevil.example'))).toBeNull();
     expect(legacyIndexRedirectTarget(new URLSearchParams('_route=%2Fseller%2F0'))).toBeNull();
+    expect(legacyIndexRedirectTarget(new URLSearchParams('_route=%2Faccount%2Forders%2F9'))).toBeNull();
   });
 });

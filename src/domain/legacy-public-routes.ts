@@ -43,7 +43,7 @@ export function legacyIndexRedirectTarget(searchParams: URLSearchParams): string
   const route = routes[0].replace(/\/$/, '') || '/';
   let target: string | null = legacyIndexExactTargets.has(route) ? route : null;
   const publicRecord = /^\/(?:directory|product)\/[a-z0-9-]{1,190}$/.exec(route);
-  const preservedPrivateRecord = /^\/(?:messages\/[1-9][0-9]*|account\/orders\/[1-9][0-9]*)$/.exec(route);
+  const preservedPrivateRecord = /^\/messages\/[1-9][0-9]*$/.exec(route);
   const sellerWorkspace = /^\/seller\/([1-9][0-9]*)$/.exec(route);
   if (publicRecord || preservedPrivateRecord) target = route;
   else if (sellerWorkspace) target = `/seller/organization/${sellerWorkspace[1]}`;

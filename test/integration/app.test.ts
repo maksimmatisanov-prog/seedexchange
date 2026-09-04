@@ -132,6 +132,7 @@ describe('public application', () => {
     expect((await app.inject({ method: 'GET', url: '/index.php?_route=%2Fseller%2F42&tab=exchange' })).headers.location)
       .toBe('/seller/organization/42?tab=exchange');
     expect((await app.inject({ method: 'GET', url: '/index.php?_route=%2Fcart' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/index.php?_route=%2Faccount%2Forders%2F9' })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/index.php?_route=https%3A%2F%2Fevil.example' })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/product/?slug=../../cart' })).statusCode).toBe(404);
   });
