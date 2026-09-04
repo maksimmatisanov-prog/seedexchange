@@ -96,6 +96,13 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 
 1. Install the production systemd unit but keep Caddy and DNS unchanged. Start the Node service on loopback port 4200.
 2. Verify `/health`, `/ready`, `/`, `/directory`, representative organizations, organization logo/cover media responses, `/marketplace`, representative external products, `/exchange`, `/robots.txt`, `/sitemap.xml`, static assets and a 404 using a local Host header.
+   Run the read-only production smoke gate with real migrated slugs and one real media key:
+
+   ```powershell
+   npm run verify:discovery-runtime -- --origin=http://127.0.0.1:4200 --migration=003_discovery_migration_scope.sql --organization=/directory/<slug> --product=/product/<slug> --media=/media/<key>.webp
+   ```
+
+   It sends only GET requests with `Host: seedexchange.online` and must report `ready: true`. It also requires production security headers, canonical URLs, the discovery payment notice, an external-only product action, sitemap membership and non-empty WebP media.
 3. Run the public acceptance suite with `PLAYWRIGHT_EXPECT_LAUNCH_PHASE=discovery` and `PLAYWRIGHT_EXPECT_MIGRATION=003_discovery_migration_scope.sql`. It must confirm all four commerce capability flags are false and that cart add/remove, checkout, Stripe webhook, seller product/shipping/order and ordinary product-moderation mutations return 404 before authentication or CSRF handling.
 4. Verify administrator login and batch moderation without creating orders or enabling payment flags.
 5. Run responsive and accessibility checks at 375, 768 and 1440 px. Inspect logs and resource usage.
