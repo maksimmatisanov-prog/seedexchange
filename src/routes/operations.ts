@@ -48,15 +48,16 @@ export async function registerOperationRoutes(app: FastifyInstance) {
   app.post('/organization/submit', async (request, reply) => {
     const user = requireUser(request);
     if (!user.emailVerifiedAt) throw Object.assign(new Error('Verify your email before submitting an organization.'), { statusCode: 403 });
-    const form = z.object({ csrf: z.string(), type: z.enum(['seed_bank','botanic_garden','nursery','shop','grower','collector']), name: z.string().trim().min(2).max(190), country: z.string().trim().min(2).max(100), description: z.string().trim().min(30).max(5000), website_url: z.union([z.literal(''),z.string().url()]).default('') }).parse(request.body);
+    const form = z.object({ csrf: z.string(), type: z.enum(['seed_bank','botanic_garden','nursery','shop','grower','collector']), name: z.string().trim().min(2).max(190), country: z.string().trim().min(2).max(100), description: z.string().trim().min(30).max(5000), website_url: z.string().trim().max(500).default('') }).parse(request.body);
     assertCsrf(request, form.csrf);
+    const websiteUrl = normalizePublicHttpUrl(form.website_url);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       const base = slugify(form.name) || `organization-${Date.now()}`;
       let slug = base; let suffix = 1;
       while ((await client.query('SELECT 1 FROM organizations WHERE slug=$1', [slug])).rowCount) slug = `${base}-${++suffix}`;
-      const created = await client.query<{ id: string }>(`INSERT INTO organizations(type,name,slug,country,description,website_url) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`, [form.type, form.name, slug, form.country, form.description, form.website_url || null]);
+      const created = await client.query<{ id: string }>(`INSERT INTO organizations(type,name,slug,country,description,website_url) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`, [form.type, form.name, slug, form.country, form.description, websiteUrl]);
       await client.query(`INSERT INTO organization_members(organization_id,user_id,role) VALUES($1,$2,'admin')`, [created.rows[0].id, user.id]);
       await client.query(`UPDATE users SET role=CASE WHEN role='buyer' THEN 'org_admin' ELSE role END WHERE id=$1`, [user.id]);
       await client.query('COMMIT');

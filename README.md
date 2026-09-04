@@ -28,6 +28,7 @@ npm run migrate-legacy -- --inventory --scope=discovery
 npm run migrate-legacy -- --dry-run --scope=discovery
 npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
 npm run prepare:supplier-batch -- --limit=200
+npm run verify:discovery-data
 npm run verify:media
 npm run backfill:media-sha
 npm run manifest:media -- --root=<restored-legacy-uploads> --output=<secure-manifest.json>

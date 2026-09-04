@@ -1,3 +1,5 @@
+import { isExternalHttpsUrl } from './public-url.js';
+
 export type LegacyMigrationScope = 'discovery' | 'full';
 export type LegacyTablePlan = { source: string; target: string; where?: string };
 
@@ -96,11 +98,7 @@ export function validateDiscoveryRow(target: string, row: Record<string, unknown
   if (target !== 'products') return [];
   const errors: string[] = [];
   if (row.purchase_mode !== 'external') errors.push('Discovery migration accepts only external products.');
-  const url = String(row.external_purchase_url ?? '');
-  try {
-    if (new URL(url).protocol !== 'https:') errors.push('External product URL must use HTTPS.');
-  } catch {
-    errors.push('External product URL must be valid.');
-  }
+  if (!isExternalHttpsUrl(row.external_purchase_url)) errors.push('External product URL must be a valid public HTTPS URL.');
+  if (row.image_url !== null && row.image_url !== undefined && String(row.image_url).trim() && !isExternalHttpsUrl(row.image_url)) errors.push('External product image URL must be a valid public HTTPS URL.');
   return errors;
 }

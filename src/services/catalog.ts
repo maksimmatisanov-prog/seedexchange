@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { pool } from '../db/pool.js';
 import { ORGANIZATION_CHANNELS, normalizeOrganizationChannel, normalizePublicHttpUrl, type OrganizationChannel } from '../domain/organization.js';
+import { sanitizePublicProductUrls } from '../domain/public-url.js';
 
 export type OrganizationCard = { id: string; name: string; slug: string; type: string; country: string; description: string; specialties: string | null; founder_slot: number | null; logo_key: string | null };
 export type ProductCard = { id: string; name: string; botanical_name: string | null; slug: string; category: string | null; price_cents: string; compare_at_price_cents: string | null; currency: string; stock_quantity: number; image_url: string | null; purchase_mode: string; external_purchase_url: string | null; organization_name: string; organization_slug: string };
@@ -18,6 +19,11 @@ function safeChannel(channel: { channel_type: string; label: string; url: string
 }
 
 const safeExchange = (exchange: ExchangeCard): ExchangeCard => ({ ...exchange, contact_url: safePublicUrl(exchange.contact_url) });
+
+function safeProduct<T extends ProductCard>(product: T): T | null {
+  const urls = sanitizePublicProductUrls(product);
+  return urls ? { ...product, ...urls } : null;
+}
 
 export async function homeModel() {
   const [counts, organizations, products, exchanges] = await Promise.all([
@@ -70,15 +76,15 @@ export async function listProducts(options: { q?: string; category?: string; org
     p.currency,p.stock_quantity,p.image_url,p.purchase_mode,p.external_purchase_url,o.name organization_name,o.slug organization_slug
     FROM products p JOIN organizations o ON o.id=p.organization_id WHERE ${where.join(' AND ')}
     ORDER BY p.updated_at DESC,p.id DESC LIMIT $${params.length}`, params);
-  return result.rows;
+  return result.rows.map(safeProduct).filter((product): product is ProductCard => product !== null);
 }
 
-export async function getProduct(slug: string) {
-  const result = await pool.query(`SELECT p.*,o.name organization_name,o.slug organization_slug,o.payout_policy
+export async function getProduct(slug: string): Promise<(ProductCard & Record<string, unknown>) | null> {
+  const result = await pool.query<ProductCard & Record<string, unknown>>(`SELECT p.*,o.name organization_name,o.slug organization_slug,o.payout_policy
     FROM products p JOIN organizations o ON o.id=p.organization_id
     WHERE p.slug=$1 AND p.status='active' AND o.status='approved' AND p.purchase_mode=ANY($2::text[])
     AND (p.purchase_mode<>'external' OR p.external_purchase_url~*'^https://')`, [slug, config.PUBLIC_PRODUCT_MODES]);
-  return result.rows[0] ?? null;
+  return result.rows[0] ? safeProduct(result.rows[0]) : null;
 }
 
 export async function listExchanges(limit = 48): Promise<ExchangeCard[]> {

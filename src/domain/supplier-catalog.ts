@@ -66,7 +66,7 @@ function integerValue(value: unknown, key: string, minimum: number): number {
 export function isHttpsUrl(value: string, requiredHost?: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && (!requiredHost || url.hostname.toLowerCase() === requiredHost.toLowerCase());
+    return url.protocol === 'https:' && !url.username && !url.password && (!requiredHost || url.hostname.toLowerCase() === requiredHost.toLowerCase());
   } catch {
     return false;
   }

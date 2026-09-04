@@ -56,7 +56,11 @@ describe('two-stage legacy migration contract', () => {
     expect(validateDiscoveryRow('products', { purchase_mode: 'marketplace', external_purchase_url: 'https://example.com' }))
       .toContain('Discovery migration accepts only external products.');
     expect(validateDiscoveryRow('products', { purchase_mode: 'external', external_purchase_url: 'http://example.com' }))
-      .toContain('External product URL must use HTTPS.');
+      .toContain('External product URL must be a valid public HTTPS URL.');
+    expect(validateDiscoveryRow('products', { purchase_mode: 'external', external_purchase_url: 'https://user:secret@example.com/product' }))
+      .toContain('External product URL must be a valid public HTTPS URL.');
+    expect(validateDiscoveryRow('products', { purchase_mode: 'external', external_purchase_url: 'https://example.com', image_url: 'https://localhost/image.jpg' }))
+      .toContain('External product image URL must be a valid public HTTPS URL.');
     expect(validateDiscoveryRow('products', { purchase_mode: 'external', external_purchase_url: 'https://example.com' })).toEqual([]);
   });
 });

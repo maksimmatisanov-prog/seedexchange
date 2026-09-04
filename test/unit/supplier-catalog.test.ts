@@ -43,6 +43,7 @@ describe('supplier catalog boundary', () => {
   it('rejects product and image links outside the allowlist', () => {
     expect(() => normalizeOreshkaRow({ ...rawOreshka, link: 'https://example.com/product' })).toThrow('Product link host is not allowed.');
     expect(() => normalizeOreshkaRow({ ...rawOreshka, image_link: 'https://oreshka-seeds.com/image.jpg' })).toThrow('Image host is not allowed.');
+    expect(() => normalizeOreshkaRow({ ...rawOreshka, link: 'https://user:secret@oreshka-seeds.com/product' })).toThrow('Product link host is not allowed.');
   });
 
   it('parses quoted CSV and records malformed rows instead of hiding them', () => {

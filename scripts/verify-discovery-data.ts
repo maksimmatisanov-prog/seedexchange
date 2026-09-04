@@ -2,11 +2,12 @@ import { pool } from '../src/db/pool.js';
 import { config } from '../src/config.js';
 import { validateDiscoveryDataReadiness, type DiscoveryDataReadiness } from '../src/domain/discovery-readiness.js';
 import { verifyMediaInventory, type MediaAssetRecord } from '../src/domain/media-verification.js';
+import { isExternalHttpsUrl } from '../src/domain/public-url.js';
 
 const expectedMigration = process.argv[2] || '003_discovery_migration_scope.sql';
 
 try {
-  const [migration, run, counts, mediaRows] = await Promise.all([
+  const [migration, run, counts, mediaRows, productUrls] = await Promise.all([
     pool.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1'),
     pool.query<{ status: string; scope: string; source_fingerprint: string }>(`SELECT status,scope,source_fingerprint
       FROM legacy_migration_runs WHERE mode='import' ORDER BY completed_at DESC NULLS LAST,started_at DESC LIMIT 1`),
@@ -20,11 +21,13 @@ try {
        (SELECT count(*) FROM stripe_events)+(SELECT count(*) FROM seller_transfers)+(SELECT count(*) FROM delivery_cases)+
        (SELECT count(*) FROM reviews)+(SELECT count(*) FROM review_responses))::text forbidden_commerce_rows,
       (SELECT count(*) FROM organizations WHERE marketplace_enabled OR stripe_account_id IS NOT NULL OR stripe_charges_enabled OR stripe_payouts_enabled)::text payment_capability_organizations,
-      (SELECT count(*) FROM products WHERE purchase_mode<>'external' OR external_purchase_url IS NULL OR external_purchase_url!~*'^https://')::text invalid_discovery_products,
       (SELECT count(*) FROM supplier_publication_batches WHERE status='pending_review')::text open_supplier_batches,
       (SELECT count(*) FROM supplier_publication_batches WHERE status='approved' AND sitemap_status='failed')::text failed_sitemap_batches,
       (SELECT count(*) FROM products WHERE status='pending_review')::text pending_product_reviews`),
     pool.query<MediaAssetRecord>('SELECT storage_key,mime_type,byte_size,width_px,height_px,sha256,is_active FROM media_assets ORDER BY storage_key'),
+    pool.query<{ purchase_mode: string; external_purchase_url: string | null; image_url: string | null }>(
+      'SELECT purchase_mode,external_purchase_url,image_url FROM products',
+    ),
   ]);
   const media = await verifyMediaInventory(mediaRows.rows, config.MEDIA_ROOT);
   const row = counts.rows[0];
@@ -41,7 +44,11 @@ try {
     activeExchanges: Number(row.active_exchanges),
     forbiddenCommerceRows: Number(row.forbidden_commerce_rows),
     paymentCapabilityOrganizations: Number(row.payment_capability_organizations),
-    invalidDiscoveryProducts: Number(row.invalid_discovery_products),
+    invalidDiscoveryProducts: productUrls.rows.filter((product) =>
+      product.purchase_mode !== 'external'
+      || !isExternalHttpsUrl(product.external_purchase_url)
+      || (Boolean(product.image_url?.trim()) && !isExternalHttpsUrl(product.image_url)),
+    ).length,
     openSupplierBatches: Number(row.open_supplier_batches),
     failedSitemapBatches: Number(row.failed_sitemap_batches),
     pendingProductReviews: Number(row.pending_product_reviews),
