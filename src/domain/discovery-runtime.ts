@@ -61,33 +61,24 @@ const fetchWithProductionHost: RuntimeFetcher = async (input, init) => new Promi
   request.end();
 });
 
-function validatePath(value: string, prefix: string, label: string): string[] {
-  if (!value.startsWith(prefix) || value === prefix || value.startsWith('//') || value.includes('?') || value.includes('#')) {
-    return [`${label} must be a query-free local path below ${prefix}.`];
-  }
-  try {
-    const parsed = new URL(value, productionOrigin);
-    if (parsed.origin !== productionOrigin || parsed.pathname !== value) return [`${label} is not a normalized local path.`];
-  } catch {
-    return [`${label} is not a valid local path.`];
-  }
-  return [];
+function validatePath(value: string, pattern: RegExp, label: string): string[] {
+  return pattern.test(value) ? [] : [`${label} must be an exact normalized discovery path.`];
 }
 
 export function validateDiscoveryRuntimeOptions(options: DiscoveryRuntimeOptions): string[] {
   const errors: string[] = [];
   try {
     const origin = new URL(options.origin);
-    if (!['http:', 'https:'].includes(origin.protocol) || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== '/') {
-      errors.push('origin must be an HTTP(S) origin without credentials, path, query or fragment.');
+    if (!['http:', 'https:'].includes(origin.protocol) || !['127.0.0.1', '[::1]', 'localhost'].includes(origin.hostname) || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== '/') {
+      errors.push('origin must be a credential-free loopback HTTP(S) origin without a path, query or fragment.');
     }
   } catch {
     errors.push('origin must be a valid HTTP(S) origin.');
   }
   if (!/^\d{3}_[a-z0-9_]+\.sql$/.test(options.expectedMigration)) errors.push('expectedMigration must be a migration filename.');
-  errors.push(...validatePath(options.organizationPath, '/directory/', 'organizationPath'));
-  errors.push(...validatePath(options.productPath, '/product/', 'productPath'));
-  errors.push(...validatePath(options.mediaPath, '/media/', 'mediaPath'));
+  errors.push(...validatePath(options.organizationPath, /^\/directory\/[a-z0-9-]+$/, 'organizationPath'));
+  errors.push(...validatePath(options.productPath, /^\/product\/[a-z0-9-]+$/, 'productPath'));
+  errors.push(...validatePath(options.mediaPath, /^\/media\/[a-f0-9]{40}\.webp$/, 'mediaPath'));
   return errors;
 }
 

@@ -26,6 +26,7 @@
     "verify:discovery-rehearsal": "node dist/scripts/verify-discovery-rehearsal.js",
     "verify:production-env": "node dist/scripts/verify-production-environment.js",
     "verify:production-observation": "node dist/scripts/verify-production-observation.js",
+    "verify:discovery-load": "node dist/scripts/verify-discovery-load.js",
     "verify:discovery-runtime": "node dist/scripts/verify-discovery-runtime.js",
     "manifest:release": "node dist/scripts/create-release-manifest.js",
     "verify:release": "node dist/scripts/verify-release-manifest.js",

@@ -78,8 +78,8 @@ describe('discovery production runtime verification', () => {
   it('rejects unsafe origins and non-representative paths before making requests', async () => {
     expect(validateDiscoveryRuntimeOptions({ ...options, origin: 'https://user:secret@example.test/path', productPath: '//evil.test/product' }))
       .toEqual(expect.arrayContaining([
-        'origin must be an HTTP(S) origin without credentials, path, query or fragment.',
-        'productPath must be a query-free local path below /product/.',
+        'origin must be a credential-free loopback HTTP(S) origin without a path, query or fragment.',
+        'productPath must be an exact normalized discovery path.',
       ]));
     let requests = 0;
     const report = await verifyDiscoveryRuntime({ ...options, mediaPath: '/assets/not-media.webp' }, async () => {

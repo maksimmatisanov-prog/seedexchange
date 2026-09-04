@@ -63,4 +63,15 @@ describe('production discovery systemd bundle', () => {
     expect(enableTimers).toBeGreaterThan(restartPrevious);
     expect(rollback).not.toContain('enable --now "$service"');
   });
+
+  it('runs a bounded loopback load gate before enabling production timers', async () => {
+    const activation = await readFile(path.resolve('ops/activate-production-discovery.sh'), 'utf8');
+    const runtimeGate = activation.indexOf('verify-discovery-runtime.js');
+    const loadGate = activation.indexOf('verify-discovery-load.js --origin=http://127.0.0.1:4200');
+    const firstTimerStart = activation.indexOf('systemctl start seedexchange-production-sitemap.service');
+    expect(runtimeGate).toBeGreaterThan(-1);
+    expect(loadGate).toBeGreaterThan(runtimeGate);
+    expect(firstTimerStart).toBeGreaterThan(loadGate);
+    expect(activation).toContain('--requests=72 --concurrency=6 --timeout-ms=3000 --p95-ms=750');
+  });
 });

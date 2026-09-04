@@ -52,6 +52,7 @@ const requiredFiles = [
   'package.json',
   'package-lock.json',
   'dist/src/server.js',
+  'dist/scripts/verify-discovery-load.js',
   'dist/scripts/verify-production-environment.js',
   'dist/scripts/verify-production-observation.js',
   'dist/scripts/verify-release-manifest.js',
