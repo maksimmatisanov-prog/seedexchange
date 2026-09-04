@@ -29,6 +29,8 @@ npm run migrate-legacy -- --dry-run --scope=discovery
 npm run verify:discovery-rehearsal -- --inventory=<inventory-1.json> --inventory=<inventory-2.json> --dry-run=<dry-run-1.json> --dry-run=<dry-run-2.json>
 npm run verify:production-env -- --file=<private-production.env>
 npm run verify:discovery-runtime -- --origin=http://127.0.0.1:4200 --migration=003_discovery_migration_scope.sql --organization=/directory/<slug> --product=/product/<slug> --media=/media/<key>.webp
+npm run manifest:release -- --root=<absolute-release-directory> --commit=<git-sha> --tree=<git-tree-sha> --output=<absolute-release-directory>/RELEASE.json
+npm run verify:release -- --root=<absolute-release-directory> --manifest=<absolute-release-directory>/RELEASE.json --commit=<git-sha>
 npm run manifest:discovery-backup -- --mysql-dump=<absolute-file> --uploads-archive=<absolute-file> --legacy-release=<absolute-file> --output=<absolute-new.json>
 npm run verify:discovery-backup -- --manifest=<absolute.json> --mysql-dump=<absolute-file> --uploads-archive=<absolute-file> --legacy-release=<absolute-file>
 npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
@@ -49,7 +51,7 @@ npm run manifest:media -- --root=<restored-legacy-uploads> --output=<secure-mani
 - `scripts/`: compiled operational and legacy migration commands.
 - `src/templates/` and `public/assets/`: EJS pages and shared design system.
 - `test/`: unit, integration and browser checks.
-- `ops/`: systemd, Caddy and immutable staging release templates.
+- `ops/`: systemd, Caddy, staging deployment and separately approval-gated production discovery preparation/activation.
 - `ops/PRODUCTION_DISCOVERY_RUNBOOK.md`: approval-gated phase-1 production cutover and rollback procedure.
 - `MIGRATION.md`: verified evidence, gaps and acceptance gates.
 - `BRIEF.md`: concise product brief, current stage, commercial benchmark and recommended work order.

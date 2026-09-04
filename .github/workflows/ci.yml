@@ -47,16 +47,29 @@ jobs:
       - run: npm audit --omit=dev
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Build production discovery artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          release_root="$RUNNER_TEMP/seedexchange-production-discovery"
+          mkdir -p "$release_root/src"
+          cp -a dist public "$release_root/"
+          cp -a src/templates "$release_root/src/"
+          cp package.json package-lock.json .nvmrc "$release_root/"
+          git_tree="$(git rev-parse 'HEAD^{tree}')"
+          node dist/scripts/create-release-manifest.js --root="$release_root" --commit="$GITHUB_SHA" --tree="$git_tree" --output="$release_root/RELEASE.json"
+          node dist/scripts/verify-release-manifest.js --root="$release_root" --manifest="$release_root/RELEASE.json" --commit="$GITHUB_SHA"
+          source_epoch="$(git show -s --format=%ct HEAD)"
+          artifact="$GITHUB_WORKSPACE/seedexchange-$GITHUB_SHA.tar.gz"
+          tar --sort=name --mtime="@$source_epoch" --owner=0 --group=0 --numeric-owner -czf "$artifact" -C "$release_root" .
+          (cd "$GITHUB_WORKSPACE" && sha256sum "$(basename "$artifact")" > "$(basename "$artifact").sha256")
       - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         with:
-          name: seedexchange-${{ github.sha }}
+          name: seedexchange-production-discovery-${{ github.sha }}
           if-no-files-found: error
           retention-days: 14
           path: |
-            dist/
-            public/
-            src/templates/
-            src/db/migrations/
-            package.json
-            package-lock.json
-            .nvmrc
+            seedexchange-${{ github.sha }}.tar.gz
+            seedexchange-${{ github.sha }}.tar.gz.sha256

@@ -54,8 +54,14 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    ```
 
    It must report `ready: true`. Create the configured media directory for the `seedexchange` service account with no public write access.
-3. Extract the exact reviewed GitHub/CI artifact into an immutable release, verify its SHA-256, run `npm ci`, `npm run check`, `npm test`, `npm run build` and `npm prune --omit=dev`.
-4. Apply the ordered PostgreSQL migrations. `/ready` must report the latest migration bundled in the artifact.
+3. Select one reviewed commit merged to `master` whose CI passed TypeScript, PostgreSQL-backed tests, build, production dependency audit and Chromium acceptance. Production artifacts are not emitted for pull requests or feature-branch pushes. Download only its `seedexchange-production-discovery-<commit>` artifact. It contains a tar archive, SHA-256 sidecar and an internal `RELEASE.json` that fingerprints every allowlisted runtime file and pins the Git commit, tree, Node major and newest migration. Record the GitHub artifact digest, archive SHA-256 and commit as one approval set.
+4. After explicit preparation approval, use the exact approved archive values:
+
+   ```bash
+   SEEDX_PRODUCTION_DISCOVERY_PREPARE_APPROVED=YES bash ops/deploy-production-discovery.sh /secure/seedexchange-<commit>.tar.gz <sha256> <40-char-commit>
+   ```
+
+   The script rejects unsafe archive paths and file types, verifies the outer SHA-256 and internal file manifest before `npm ci`, validates the private production environment, applies only ordered PostgreSQL schema migrations and leaves the release read-only. It does not switch `current`, start the service, import data, or change Caddy/DNS.
 5. From the restored legacy uploads, generate a source manifest with `npm run manifest:media -- --root=/absolute/restored/uploads --output=/secure/source-media-manifest.json`; record the manifest file's own SHA-256 with the backup evidence. Then copy required first-party media into `shared/storage/media`. External Oreshka images remain HTTPS URLs and are not copied.
 
 ## 4. Rehearse and import discovery data
@@ -94,15 +100,14 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 
 ## 5. Private runtime acceptance
 
-1. Install the production systemd unit but keep Caddy and DNS unchanged. Start the Node service on loopback port 4200.
-2. Verify `/health`, `/ready`, `/`, `/directory`, representative organizations, organization logo/cover media responses, `/marketplace`, representative external products, `/exchange`, `/robots.txt`, `/sitemap.xml`, static assets and a 404 using a local Host header.
-   Run the read-only production smoke gate with real migrated slugs and one real media key:
+1. Install the reviewed production systemd unit but keep it stopped and keep Caddy and DNS unchanged. Record one approved organization slug, external product slug and first-party media key from the verified migration.
+2. After separate explicit activation approval, activate only the prepared commit. The command re-verifies the release, environment, source media manifest and discovery database before switching `current`; after restart it requires readiness plus the full read-only runtime gate. A failed restart or gate restores the previous application symlink and service (or stops the first deployment):
 
-   ```powershell
-   npm run verify:discovery-runtime -- --origin=http://127.0.0.1:4200 --migration=003_discovery_migration_scope.sql --organization=/directory/<slug> --product=/product/<slug> --media=/media/<key>.webp
+   ```bash
+   SEEDX_PRODUCTION_DISCOVERY_ACTIVATE_APPROVED=YES bash ops/activate-production-discovery.sh <40-char-commit> 003_discovery_migration_scope.sql /secure/source-media-manifest.json /directory/<slug> /product/<slug> /media/<key>.webp
    ```
 
-   It sends only GET requests with `Host: seedexchange.online` and must report `ready: true`. It also requires production security headers, canonical URLs, the discovery payment notice, an external-only product action, sitemap membership and non-empty WebP media.
+   The runtime portion sends only GET requests with `Host: seedexchange.online`. It requires production security headers, canonical URLs, the discovery payment notice, an external-only product action, sitemap membership and non-empty WebP media. Activation does not change Caddy or DNS.
 3. Run the public acceptance suite with `PLAYWRIGHT_EXPECT_LAUNCH_PHASE=discovery` and `PLAYWRIGHT_EXPECT_MIGRATION=003_discovery_migration_scope.sql`. It must confirm all four commerce capability flags are false and that cart add/remove, checkout, Stripe webhook, seller product/shipping/order and ordinary product-moderation mutations return 404 before authentication or CSRF handling.
 4. Verify administrator login and batch moderation without creating orders or enabling payment flags.
 5. Run responsive and accessibility checks at 375, 768 and 1440 px. Inspect logs and resource usage.

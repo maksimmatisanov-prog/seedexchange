@@ -26,6 +26,8 @@
     "verify:discovery-rehearsal": "node dist/scripts/verify-discovery-rehearsal.js",
     "verify:production-env": "node dist/scripts/verify-production-environment.js",
     "verify:discovery-runtime": "node dist/scripts/verify-discovery-runtime.js",
+    "manifest:release": "node dist/scripts/create-release-manifest.js",
+    "verify:release": "node dist/scripts/verify-release-manifest.js",
     "verify:media": "node dist/scripts/verify-media.js",
     "backfill:media-sha": "node dist/scripts/backfill-media-sha.js",
     "manifest:media": "node dist/scripts/media-manifest.js",
