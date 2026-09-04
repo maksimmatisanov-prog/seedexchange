@@ -3,6 +3,7 @@ import { request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import type { TLSSocket } from 'node:tls';
 import { validateLaunchReadiness, type LaunchReadiness } from './launch.js';
+import { LEGACY_PUBLIC_STATIC_REDIRECTS } from './legacy-public-routes.js';
 
 const productionOrigin = 'https://seedexchange.online';
 const maximumResponseBytes = 2_000_000;
@@ -140,6 +141,7 @@ export async function verifyPublicCutover(options: PublicCutoverOptions, depende
     `${productionOrigin}/health`, `${productionOrigin}/ready`, `${productionOrigin}${options.organizationPath}`,
     `${productionOrigin}${options.productPath}`, `${productionOrigin}/sitemap.xml`, `${productionOrigin}${options.mediaPath}`,
     `${productionOrigin}/cart`, 'https://www.seedexchange.online/cutover-probe?source=www',
+    ...LEGACY_PUBLIC_STATIC_REDIRECTS.map(([legacyPath]) => `${productionOrigin}${legacyPath}`),
     `${productionOrigin}/directory/?slug=${options.organizationPath.slice('/directory/'.length)}`,
     `${productionOrigin}/product/?slug=${options.productPath.slice('/product/'.length)}`,
   ];
@@ -148,7 +150,8 @@ export async function verifyPublicCutover(options: PublicCutoverOptions, depende
     try { responses.set(value, await requester(new URL(value))); }
     catch { errors.push(`HTTPS request failed for ${new URL(value).pathname}.`); }
   }
-  const expectedStatuses = new Map(urls.map((url) => [url, url.includes('?slug=') ? 301 : url.endsWith('/cart') ? 404 : url.startsWith('https://www.') ? 308 : 200]));
+  const legacyStaticUrls = new Set(LEGACY_PUBLIC_STATIC_REDIRECTS.map(([legacyPath]) => `${productionOrigin}${legacyPath}`));
+  const expectedStatuses = new Map(urls.map((url) => [url, url.includes('?slug=') || legacyStaticUrls.has(url) ? 301 : url.endsWith('/cart') ? 404 : url.startsWith('https://www.') ? 308 : 200]));
   for (const [url, response] of responses) {
     if (response.status !== expectedStatuses.get(url)) errors.push(`${new URL(url).pathname} returned HTTP ${String(response.status)} instead of ${String(expectedStatuses.get(url))}.`);
     if (!['TLSv1.2', 'TLSv1.3'].includes(response.tlsProtocol ?? '')) errors.push(`${new URL(url).pathname} did not negotiate TLS 1.2 or 1.3.`);
@@ -178,6 +181,9 @@ export async function verifyPublicCutover(options: PublicCutoverOptions, depende
     [`${productionOrigin}/product/?slug=${options.productPath.slice('/product/'.length)}`, options.productPath],
   ]) {
     if (responses.get(legacyUrl)?.location !== canonicalPath) errors.push(`${new URL(legacyUrl).pathname}?slug did not redirect to ${canonicalPath}.`);
+  }
+  for (const [legacyPath, canonicalPath] of LEGACY_PUBLIC_STATIC_REDIRECTS) {
+    if (responses.get(`${productionOrigin}${legacyPath}`)?.location !== canonicalPath) errors.push(`${legacyPath} did not redirect to ${canonicalPath}.`);
   }
   for (const response of responses.values()) {
     if (response.headers['x-content-type-options'] !== 'nosniff') errors.push(`${new URL(response.url).pathname} is missing X-Content-Type-Options.`);

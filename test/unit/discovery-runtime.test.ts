@@ -5,6 +5,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { validateDiscoveryRuntimeOptions, verifyDiscoveryRuntime, type DiscoveryRuntimeOptions } from '../../src/domain/discovery-runtime.js';
+import { legacyStaticRedirectTarget } from '../../src/domain/legacy-public-routes.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -27,6 +28,8 @@ const headers = {
 function response(path: string): Response {
   if (path.startsWith('/directory/?slug=')) return new Response(null, { status: 301, headers: { ...headers, location: options.organizationPath } });
   if (path.startsWith('/product/?slug=')) return new Response(null, { status: 301, headers: { ...headers, location: options.productPath } });
+  const staticRedirect = legacyStaticRedirectTarget(path);
+  if (staticRedirect) return new Response(null, { status: 301, headers: { ...headers, location: staticRedirect } });
   const canonical = `<link rel="canonical" href="https://seedexchange.online${path}">`;
   if (path === '/health') return Response.json({ status: 'ok', launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }, { headers });
   if (path === '/ready') return Response.json({ status: 'ready', database: 'ok', migration: options.expectedMigration, launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }, { headers });
@@ -52,7 +55,7 @@ describe('discovery production runtime verification', () => {
       return response(`${url.pathname}${url.search}`);
     });
     expect(report).toMatchObject({ ready: true, expectedMigration: options.expectedMigration, errors: [] });
-    expect(report.checks).toHaveLength(15);
+    expect(report.checks).toHaveLength(23);
     expect(requested).toContain(options.mediaPath);
   });
 
@@ -66,6 +69,7 @@ describe('discovery production runtime verification', () => {
       if (path === options.productPath) return new Response(`<link rel="canonical" href="https://seedexchange.online${path}"><form action="/cart/add"></form>`, { headers: { ...headers, 'content-type': 'text/html' } });
       if (path === '/sitemap.xml') return new Response('<urlset></urlset>', { headers: { ...headers, 'content-type': 'application/xml' } });
       if (path.startsWith('/product/?slug=')) return new Response(null, { status: 301, headers: { ...headers, location: '/product/wrong' } });
+      if (path === '/about/') return new Response(null, { status: 301, headers: { ...headers, location: '/wrong' } });
       return response(path);
     });
     expect(report.ready).toBe(false);
@@ -77,6 +81,7 @@ describe('discovery production runtime verification', () => {
       `${options.productPath} did not expose an external-only purchase action.`,
       `/sitemap.xml is missing ${options.organizationPath}.`,
       `/product/?slug=${options.productPath.slice('/product/'.length)} did not redirect to ${options.productPath}.`,
+      '/about/ did not redirect to /about.',
     ]));
   });
 
@@ -119,7 +124,7 @@ describe('discovery production runtime verification', () => {
         `--media=${options.mediaPath}`,
       ], { cwd: process.cwd(), encoding: 'utf8' });
       expect(JSON.parse(execution.stdout)).toMatchObject({ ready: true, errors: [] });
-      expect(receivedHosts).toHaveLength(15);
+      expect(receivedHosts).toHaveLength(23);
       expect(new Set(receivedHosts)).toEqual(new Set(['seedexchange.online']));
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

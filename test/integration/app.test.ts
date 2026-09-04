@@ -115,6 +115,11 @@ describe('public application', () => {
       expect(legacy.headers.location).toBe(location);
     }
     expect((await app.inject({ method: 'GET', url: '/directory/' })).headers.location).toBe('/directory');
+    for (const path of ['/marketplace', '/exchange', '/about', '/pricing', '/economics', '/terms', '/privacy']) {
+      const legacy = await app.inject({ method: 'GET', url: `${path}/?source=legacy` });
+      expect(legacy.statusCode).toBe(301);
+      expect(legacy.headers.location).toBe(`${path}?source=legacy`);
+    }
     expect((await app.inject({ method: 'GET', url: '/product/?slug=../../cart' })).statusCode).toBe(404);
   });
 });

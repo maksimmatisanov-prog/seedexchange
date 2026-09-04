@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validatePublicCutoverOptions, verifyPublicCutover, type PublicCutoverOptions } from '../../src/domain/public-cutover.js';
+import { legacyStaticRedirectTarget } from '../../src/domain/legacy-public-routes.js';
 
 const options: PublicCutoverOptions = {
   expectedIpv4: '187.52.119.107', expectedIpv6: null, expectedMigration: '003_discovery_migration_scope.sql',
@@ -11,6 +12,8 @@ function response(url: URL) {
   const base = { url: url.toString(), status: 200, contentType: 'text/html', bytes: 10, durationMs: 12, tlsProtocol: 'TLSv1.3', location: null, headers: security, body: '' };
   if (url.pathname === '/directory/' && url.searchParams.has('slug')) return { ...base, status: 301, location: options.organizationPath };
   if (url.pathname === '/product/' && url.searchParams.has('slug')) return { ...base, status: 301, location: options.productPath };
+  const staticRedirect = legacyStaticRedirectTarget(url.pathname, url.search);
+  if (staticRedirect) return { ...base, status: 301, location: staticRedirect };
   if (url.pathname === '/health') return { ...base, contentType: 'application/json', body: JSON.stringify({ status: 'ok', launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }) };
   if (url.pathname === '/ready') return { ...base, contentType: 'application/json', body: JSON.stringify({ status: 'ready', database: 'ok', migration: options.expectedMigration, launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }) };
   if (url.pathname === options.organizationPath) return { ...base, body: `<link rel="canonical" href="https://seedexchange.online${options.organizationPath}">` };
@@ -39,7 +42,7 @@ describe('public discovery cutover evidence', () => {
     });
     expect(report).toMatchObject({ ready: true, errors: [] });
     expect(report.dns).toHaveLength(4);
-    expect(report.http).toHaveLength(10);
+    expect(report.http).toHaveLength(18);
     expect(report.http.every((item) => !('body' in item) && !('headers' in item))).toBe(true);
   });
 
@@ -51,7 +54,8 @@ describe('public discovery cutover evidence', () => {
         if (url.pathname === '/health') current.body = JSON.stringify({ status: 'ok', launchPhase: 'commerce', commerceEnabled: true, connectEnabled: true, marketplacePaymentsEnabled: true, payoutWorkerEnabled: true });
         return { ...current, tlsProtocol: 'TLSv1.1', location: url.hostname === 'www.seedexchange.online'
           ? 'https://wrong.example/'
-          : url.pathname === '/product/' && url.searchParams.has('slug') ? '/product/wrong' : current.location };
+          : url.pathname === '/product/' && url.searchParams.has('slug') ? '/product/wrong'
+            : url.pathname === '/about/' ? '/wrong' : current.location };
       },
     });
     expect(report.ready).toBe(false);
@@ -61,6 +65,7 @@ describe('public discovery cutover evidence', () => {
       '/health did not confirm the discovery-only boundary.',
       'www did not redirect to the exact canonical URI.',
       `/product/?slug did not redirect to ${options.productPath}.`,
+      '/about/ did not redirect to /about.',
     ]));
     expect(report.errors.some((error) => error.includes('TLS 1.2 or 1.3'))).toBe(true);
   });

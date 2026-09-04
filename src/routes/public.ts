@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { content } from '../content/en.js';
 import { pool } from '../db/pool.js';
 import { pageModel } from '../lib/view.js';
+import { LEGACY_PUBLIC_STATIC_REDIRECTS, legacyStaticRedirectTarget } from '../domain/legacy-public-routes.js';
 import { getOrganization, getProduct, homeModel, listExchanges, listOrganizations, listProducts } from '../services/catalog.js';
 
 const slugSchema = z.string().regex(/^[a-z0-9-]{1,190}$/);
@@ -56,7 +57,8 @@ export async function registerPublicRoutes(app: FastifyInstance) {
   const directoryIndex = async (request: FastifyRequest, reply: FastifyReply) => {
     const legacySlug = legacyQuerySlug(request.query);
     if (legacySlug) return reply.redirect(`/directory/${legacySlug}`, 301);
-    if (new URL(request.url, 'http://localhost').pathname === '/directory/') return reply.redirect('/directory', 301);
+    const url = new URL(request.url, 'http://localhost');
+    if (url.pathname === '/directory/') return reply.redirect(`/directory${url.search}`, 301);
     let organizations: Awaited<ReturnType<typeof listOrganizations>> = [];
     try { organizations = await listOrganizations(); } catch (error) { request.log.debug({ err: error }, 'Directory unavailable'); }
     return reply.view('pages/catalog/directory.ejs', pageModel(request, { ...content.directory, canonical: '/directory', organizations }));
@@ -68,6 +70,14 @@ export async function registerPublicRoutes(app: FastifyInstance) {
     if (!organization) return reply.code(404).view('pages/not-found.ejs', pageModel(request, { title: 'Organization not found', description: 'This organization is not available.', canonical: null }));
     return reply.view('pages/catalog/organization.ejs', pageModel(request, { title: organization.name, description: organization.description, canonical: `/directory/${organization.slug}`, organization }));
   });
+
+  for (const [legacyPath] of LEGACY_PUBLIC_STATIC_REDIRECTS) {
+    if (legacyPath === '/directory/') continue;
+    app.get(legacyPath, async (request, reply) => {
+      const url = new URL(request.url, 'http://localhost');
+      return reply.redirect(legacyStaticRedirectTarget(url.pathname, url.search)!, 301);
+    });
+  }
 
   app.get('/marketplace', async (request, reply) => {
     const query = z.object({ q: z.string().trim().max(100).optional(), category: z.string().trim().max(100).optional() }).parse(request.query);

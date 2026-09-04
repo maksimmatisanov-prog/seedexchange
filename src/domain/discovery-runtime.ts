@@ -1,6 +1,7 @@
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { validateLaunchReadiness, type LaunchReadiness } from './launch.js';
+import { LEGACY_PUBLIC_STATIC_REDIRECTS } from './legacy-public-routes.js';
 
 const productionOrigin = 'https://seedexchange.online';
 const maximumResponseBytes = 12_000_000;
@@ -140,6 +141,7 @@ export async function verifyDiscoveryRuntime(
     '/sitemap.xml',
     '/assets/app.css',
     options.mediaPath,
+    ...LEGACY_PUBLIC_STATIC_REDIRECTS.map(([legacyPath]) => legacyPath),
     `/directory/?slug=${options.organizationPath.slice('/directory/'.length)}`,
     `/product/?slug=${options.productPath.slice('/product/'.length)}`,
     '/__seedexchange_discovery_runtime_probe__',
@@ -172,7 +174,9 @@ export async function verifyDiscoveryRuntime(
   }
 
   for (const [requestPath, response] of responses) {
-    const expectedStatus = requestPath.includes('?slug=') ? 301 : requestPath === '/__seedexchange_discovery_runtime_probe__' ? 404 : 200;
+    const expectedStatus = requestPath.includes('?slug=') || LEGACY_PUBLIC_STATIC_REDIRECTS.some(([legacyPath]) => legacyPath === requestPath)
+      ? 301
+      : requestPath === '/__seedexchange_discovery_runtime_probe__' ? 404 : 200;
     if (response.status !== expectedStatus) errors.push(`${requestPath} returned HTTP ${String(response.status)}; expected ${expectedStatus}.`);
     if (response.status !== null) requireSecurityHeaders(response, errors);
   }
@@ -213,6 +217,9 @@ export async function verifyDiscoveryRuntime(
     [`/directory/?slug=${options.organizationPath.slice('/directory/'.length)}`, options.organizationPath],
     [`/product/?slug=${options.productPath.slice('/product/'.length)}`, options.productPath],
   ]) {
+    if (responses.get(legacyPath)!.headers.get('location') !== canonicalPath) errors.push(`${legacyPath} did not redirect to ${canonicalPath}.`);
+  }
+  for (const [legacyPath, canonicalPath] of LEGACY_PUBLIC_STATIC_REDIRECTS) {
     if (responses.get(legacyPath)!.headers.get('location') !== canonicalPath) errors.push(`${legacyPath} did not redirect to ${canonicalPath}.`);
   }
 
