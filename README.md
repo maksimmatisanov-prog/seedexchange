@@ -26,6 +26,7 @@ Discovery-phase data operations are dry-run first:
 ```powershell
 npm run migrate-legacy -- --inventory --scope=discovery
 npm run migrate-legacy -- --dry-run --scope=discovery
+npm run verify:discovery-rehearsal -- --inventory=<inventory-1.json> --inventory=<inventory-2.json> --dry-run=<dry-run-1.json> --dry-run=<dry-run-2.json>
 npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
 npm run prepare:supplier-batch -- --limit=200
 npm run verify:discovery-data
@@ -34,7 +35,7 @@ npm run backfill:media-sha
 npm run manifest:media -- --root=<restored-legacy-uploads> --output=<secure-manifest.json>
 ```
 
-`migrate-legacy` defaults to the discovery scope. It requires the reviewed legacy tables and semantic columns and reads the source through one repeatable, read-only consistent snapshot; schema drift stops dry-run/import instead of silently dropping fields. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. `backfill:media-sha` is read-only by default and writes only with `-- --commit`, after all non-SHA media metadata and the required clean source manifest have matched. The full scope contains commerce history and must not be used for the discovery launch.
+`migrate-legacy` defaults to the discovery scope. It requires the reviewed legacy tables and semantic columns and reads the source through one repeatable, read-only consistent snapshot; schema drift stops dry-run/import instead of silently dropping fields. Inventory and dry-run accept `--output=<new.json>` to save an exclusive, non-overwriting evidence report; import evidence remains authoritative in PostgreSQL and cannot use this option. `verify:discovery-rehearsal` accepts exactly two inventory and two dry-run reports and requires distinct run IDs plus identical fingerprints, tables, columns and reviewed compatibility. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. `backfill:media-sha` is read-only by default and writes only with `-- --commit`, after all non-SHA media metadata and the required clean source manifest have matched. The full scope contains commerce history and must not be used for the discovery launch.
 
 ## Repository map
 

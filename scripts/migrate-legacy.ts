@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import mysql from 'mysql2/promise';
 import { Pool, type PoolClient } from 'pg';
 import { config } from '../src/config.js';
@@ -18,16 +20,25 @@ type Mode = 'inventory' | 'dry-run' | 'import';
 type Scalar = null | string | number | bigint | boolean | Date | Buffer;
 type SourceRow = Record<string, Scalar | Record<string, unknown> | unknown[]>;
 
-const args = new Set(process.argv.slice(2));
+const rawArgs = process.argv.slice(2);
+const args = new Set(rawArgs);
 const modes: Mode[] = ['inventory', 'dry-run', 'import'];
+const modeArguments = rawArgs.filter((value) => modes.some((candidate) => value === `--${candidate}`));
 const mode = modes.find((candidate) => args.has(`--${candidate}`));
-if (!mode || modes.filter((candidate) => args.has(`--${candidate}`)).length !== 1) {
+if (!mode || modeArguments.length !== 1) {
   throw new Error('Choose exactly one mode: --inventory, --dry-run, or --import.');
 }
-const scopeArguments = [...args].filter((value) => value.startsWith('--scope='));
+const scopeArguments = rawArgs.filter((value) => value.startsWith('--scope='));
 if (scopeArguments.length > 1) throw new Error('Choose one migration scope.');
 const scope = (scopeArguments[0]?.slice('--scope='.length) || 'discovery') as LegacyMigrationScope;
 if (!['discovery', 'full'].includes(scope)) throw new Error('Migration scope must be discovery or full.');
+const outputArguments = rawArgs.filter((value) => value.startsWith('--output='));
+if (outputArguments.length > 1 || outputArguments[0] === '--output=') throw new Error('Choose one non-empty output path.');
+if (rawArgs.some((value) => !modes.some((candidate) => value === `--${candidate}`) && !value.startsWith('--scope=') && !value.startsWith('--output='))) {
+  throw new Error('Unknown argument. Use one mode, [--scope=discovery|full], and [--output=/secure/report.json].');
+}
+const outputPath = outputArguments[0] ? path.resolve(outputArguments[0].slice('--output='.length)) : null;
+if (mode === 'import' && outputPath) throw new Error('--output is available only for read-only inventory and dry-run reports; successful imports are recorded in PostgreSQL.');
 if (scope === 'discovery' && config.LAUNCH_PHASE !== 'discovery') throw new Error('Discovery data migration requires LAUNCH_PHASE=discovery.');
 const tablePlan = legacyPlansForScope(scope);
 if (!config.LEGACY_MYSQL_URL) throw new Error('LEGACY_MYSQL_URL is required.');
@@ -35,6 +46,12 @@ if (!config.LEGACY_MYSQL_URL) throw new Error('LEGACY_MYSQL_URL is required.');
 const source = await mysql.createConnection({ uri: config.LEGACY_MYSQL_URL, decimalNumbers: false, supportBigNumbers: true, bigNumberStrings: true });
 const target = mode === 'inventory' ? null : new Pool({ connectionString: config.DATABASE_URL, max: 2 });
 const sourceSnapshot = 'repeatable-read-read-only';
+
+async function emitReport(report: Record<string, unknown>): Promise<void> {
+  const serialized = `${JSON.stringify(report, null, 2)}\n`;
+  if (outputPath) await writeFile(outputPath, serialized, { encoding: 'utf8', flag: 'wx' });
+  process.stdout.write(serialized);
+}
 
 async function existingSourceTables(): Promise<Set<string>> {
   const [rows] = await source.query<mysql.RowDataPacket[]>(`SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() AND table_type='BASE TABLE'`);
@@ -181,11 +198,11 @@ try {
   const plans = tablePlan;
   const sourceInventory = await inventory(plans, columnsByTable);
   const sourceFingerprint = createHash('sha256').update(JSON.stringify(sourceInventory)).digest('hex');
+  const runId = randomUUID();
   if (mode === 'inventory') {
-    console.log(JSON.stringify({ mode, scope, sourceSnapshot, sourceFingerprint, tables: sourceInventory }, null, 2));
+    await emitReport({ mode, scope, sourceSnapshot, runId, sourceFingerprint, tables: sourceInventory });
   } else {
     const client = await target!.connect();
-    const runId = randomUUID();
     try {
       await ensureEmptyTarget(client, plans);
       if (mode === 'dry-run') {
@@ -198,7 +215,7 @@ try {
             targetOnlyColumns: result.targetOnly,
           };
         }
-        console.log(JSON.stringify({ mode, scope, sourceSnapshot, runId, sourceFingerprint, tables: sourceInventory, compatibility }, null, 2));
+        await emitReport({ mode, scope, sourceSnapshot, runId, sourceFingerprint, tables: sourceInventory, compatibility });
       } else {
         await client.query('BEGIN');
         await client.query(`INSERT INTO legacy_migration_runs(id,source_fingerprint,scope,mode,status,source_inventory) VALUES($1,$2,$3,'import','running',$4::jsonb)`, [runId, sourceFingerprint, scope, JSON.stringify(sourceInventory)]);
@@ -210,7 +227,7 @@ try {
         if (mismatches.length || Object.values(orphans).some((count) => count !== 0)) throw new Error(`Parity verification failed: ${JSON.stringify({ mismatches, orphans })}`);
         await client.query(`UPDATE legacy_migration_runs SET status='succeeded',imported_counts=$2::jsonb,verification_report=$3::jsonb,completed_at=now() WHERE id=$1`, [runId, JSON.stringify(importedCounts), JSON.stringify({ orphans })]);
         await client.query('COMMIT');
-        console.log(JSON.stringify({ mode, scope, sourceSnapshot, runId, sourceFingerprint, importedCounts, orphans }, null, 2));
+        await emitReport({ mode, scope, sourceSnapshot, runId, sourceFingerprint, importedCounts, orphans });
       }
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);

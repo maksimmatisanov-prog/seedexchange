@@ -23,6 +23,7 @@
     "process-marketplace": "node dist/scripts/process-marketplace.js",
     "verify-ready": "node dist/scripts/verify-ready.js",
     "verify:discovery-data": "node dist/scripts/verify-discovery-data.js",
+    "verify:discovery-rehearsal": "node dist/scripts/verify-discovery-rehearsal.js",
     "verify:media": "node dist/scripts/verify-media.js",
     "backfill:media-sha": "node dist/scripts/backfill-media-sha.js",
     "manifest:media": "node dist/scripts/media-manifest.js",

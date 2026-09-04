@@ -18,7 +18,8 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 3. Run the compiled Node inventory twice against the same read-only MySQL snapshot:
 
    ```bash
-   npm run migrate-legacy -- --inventory --scope=discovery
+   npm run migrate-legacy -- --inventory --scope=discovery --output=/secure/inventory-1.json
+   npm run migrate-legacy -- --inventory --scope=discovery --output=/secure/inventory-2.json
    ```
 
 4. Confirm both outputs report `sourceSnapshot=repeatable-read-read-only`. Require equal ordered column lists, per-table counts, checksums and the combined `sourceFingerprint`. A missing required table/column or any drift blocks the run before creating a backup.
@@ -44,10 +45,17 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 1. Against the empty isolated PostgreSQL target, run twice:
 
    ```bash
-   npm run migrate-legacy -- --dry-run --scope=discovery
+   npm run migrate-legacy -- --dry-run --scope=discovery --output=/secure/dry-run-1.json
+   npm run migrate-legacy -- --dry-run --scope=discovery --output=/secure/dry-run-2.json
    ```
 
-2. Require the two dry runs and the final source inventory to have identical ordered column lists, counts and fingerprints. Review every `targetOnlyColumns` entry; it must match the built-in allowlist (`media_assets.sha256` and `products.publication_batch_id`). Any `sourceOnlyColumns`, required target-only field or unreviewed schema difference blocks import.
+2. Verify the four exclusive reports offline:
+
+   ```bash
+   npm run verify:discovery-rehearsal -- --inventory=/secure/inventory-1.json --inventory=/secure/inventory-2.json --dry-run=/secure/dry-run-1.json --dry-run=/secure/dry-run-2.json
+   ```
+
+   It must report `ready: true`, four distinct command `runId` values and one fingerprint. Review every `targetOnlyColumns` entry; it must match the built-in allowlist (`media_assets.sha256` and `products.publication_batch_id`). Any source/schema/count/checksum/compatibility drift blocks import.
 3. After explicit import approval, run exactly once:
 
    ```bash
