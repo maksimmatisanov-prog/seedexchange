@@ -125,6 +125,14 @@ describe('public application', () => {
       expect(legacy.statusCode).toBe(301);
       expect(legacy.headers.location).toBe(`${path}?token=preserved`);
     }
+    const token = 'a'.repeat(64);
+    const verification = await app.inject({ method: 'GET', url: `/index.php?_route=%2Fauth%2Fverify&token=${token}` });
+    expect(verification.statusCode).toBe(301);
+    expect(verification.headers.location).toBe(`/auth/verify?token=${token}`);
+    expect((await app.inject({ method: 'GET', url: '/index.php?_route=%2Fseller%2F42&tab=exchange' })).headers.location)
+      .toBe('/seller/organization/42?tab=exchange');
+    expect((await app.inject({ method: 'GET', url: '/index.php?_route=%2Fcart' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/index.php?_route=https%3A%2F%2Fevil.example' })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/product/?slug=../../cart' })).statusCode).toBe(404);
   });
 });

@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { content } from '../content/en.js';
 import { pool } from '../db/pool.js';
 import { pageModel } from '../lib/view.js';
-import { LEGACY_DISCOVERY_STATIC_REDIRECTS, legacyStaticRedirectTarget } from '../domain/legacy-public-routes.js';
+import { LEGACY_DISCOVERY_STATIC_REDIRECTS, legacyIndexRedirectTarget, legacyStaticRedirectTarget } from '../domain/legacy-public-routes.js';
 import { getOrganization, getProduct, homeModel, listExchanges, listOrganizations, listProducts } from '../services/catalog.js';
 
 const slugSchema = z.string().regex(/^[a-z0-9-]{1,190}$/);
@@ -52,6 +52,12 @@ export async function registerPublicRoutes(app: FastifyInstance) {
     let model = { stats: { organizations: '0', products: '0', exchanges: '0' }, organizations: [], products: [], exchanges: [] } as Awaited<ReturnType<typeof homeModel>>;
     try { model = await homeModel(); } catch (error) { request.log.debug({ err: error }, 'Home read model unavailable'); }
     return reply.view('pages/home.ejs', pageModel(request, { ...content.home, canonical: '/', ...model }));
+  });
+  app.get('/index.php', async (request, reply) => {
+    const url = new URL(request.url, 'http://localhost');
+    const target = legacyIndexRedirectTarget(url.searchParams);
+    if (target) return reply.redirect(target, 301);
+    return reply.code(404).view('pages/not-found.ejs', pageModel(request, { title: 'Page not found', description: 'This legacy route has no discovery-safe Node equivalent.', canonical: null }));
   });
 
   const directoryIndex = async (request: FastifyRequest, reply: FastifyReply) => {

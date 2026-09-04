@@ -14,11 +14,14 @@ describe('two-stage legacy migration contract', () => {
     const plans = legacyPlansForScope('discovery');
     const targets = plans.map((plan) => plan.target);
     expect(targets).toContain('organizations');
+    expect(targets).toContain('auth_tokens');
     expect(targets).toContain('exchange_listings');
     expect(targets).toContain('supplier_catalog_items');
     expect(targets).not.toContain('orders');
     expect(targets).not.toContain('stripe_events');
     expect(targets).not.toContain('seller_transfers');
+    expect(targets).not.toContain('sessions');
+    expect(targets).not.toContain('auth_rate_limits');
     expect(DISCOVERY_FORBIDDEN_TARGET_TABLES).toContain('orders');
   });
 

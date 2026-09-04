@@ -172,6 +172,7 @@ async function importTable(client: PoolClient, plan: LegacyTablePlan): Promise<n
 
 async function verifyOrphans(client: PoolClient): Promise<Record<string, number>> {
   const checks: Record<string, string> = {
+    auth_tokens_user: 'SELECT COUNT(*)::text total FROM auth_tokens x LEFT JOIN users p ON p.id=x.user_id WHERE p.id IS NULL',
     organization_members_user: 'SELECT COUNT(*)::text total FROM organization_members x LEFT JOIN users p ON p.id=x.user_id WHERE p.id IS NULL',
     organization_members_org: 'SELECT COUNT(*)::text total FROM organization_members x LEFT JOIN organizations p ON p.id=x.organization_id WHERE p.id IS NULL',
     products_org: 'SELECT COUNT(*)::text total FROM products x LEFT JOIN organizations p ON p.id=x.organization_id WHERE p.id IS NULL',

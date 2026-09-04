@@ -80,6 +80,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    ```
 
    It must report `ready: true`, four distinct command `runId` values and one fingerprint. Review every `targetOnlyColumns` entry; it must match the built-in allowlist (`media_assets.sha256` and `products.publication_batch_id`). Any source/schema/count/checksum/compatibility drift blocks import.
+   Confirm that `users` and `auth_tokens` are both present in the discovery inventory. Hashed verification/reset tokens are migrated so already-issued links can survive cutover; PHP sessions and authentication rate-limit buckets are intentionally excluded, so every signed-in user must authenticate again on Node.
 3. After explicit import approval, run exactly once:
 
    ```bash

@@ -29,3 +29,27 @@ export function legacyStaticRedirectTarget(pathname: string, search = ''): strin
   const match = LEGACY_DISCOVERY_STATIC_REDIRECTS.find(([legacy]) => legacy === pathname);
   return match ? `${match[1]}${search}` : null;
 }
+
+const legacyIndexExactTargets = new Set([
+  '/', '/directory', '/marketplace', '/exchange', '/search',
+  '/about', '/pricing', '/economics', '/terms', '/privacy',
+  '/register', '/login', '/forgot-password', '/reset-password',
+  '/account', '/messages', '/admin', '/auth/verify',
+]);
+
+export function legacyIndexRedirectTarget(searchParams: URLSearchParams): string | null {
+  const routes = searchParams.getAll('_route');
+  if (routes.length !== 1) return null;
+  const route = routes[0].replace(/\/$/, '') || '/';
+  let target: string | null = legacyIndexExactTargets.has(route) ? route : null;
+  const publicRecord = /^\/(?:directory|product)\/[a-z0-9-]{1,190}$/.exec(route);
+  const preservedPrivateRecord = /^\/(?:messages\/[1-9][0-9]*|account\/orders\/[1-9][0-9]*)$/.exec(route);
+  const sellerWorkspace = /^\/seller\/([1-9][0-9]*)$/.exec(route);
+  if (publicRecord || preservedPrivateRecord) target = route;
+  else if (sellerWorkspace) target = `/seller/organization/${sellerWorkspace[1]}`;
+  if (!target) return null;
+  const remaining = new URLSearchParams(searchParams);
+  remaining.delete('_route');
+  const query = remaining.toString();
+  return `${target}${query ? `?${query}` : ''}`;
+}

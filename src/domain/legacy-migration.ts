@@ -25,6 +25,7 @@ export function quotePostgresIdentifier(value: string): string {
 
 const sharedDiscoveryPlans: LegacyTablePlan[] = [
   { source: 'users', target: 'users', requiredSourceColumns: ['id','email','email_verified_at','password_hash','last_login_at','role','created_at'] },
+  { source: 'auth_tokens', target: 'auth_tokens', requiredSourceColumns: ['id','user_id','purpose','token_hash','expires_at','consumed_at','created_at'] },
   { source: 'organizations', target: 'organizations', requiredSourceColumns: ['id','type','name','slug','country','country_code','region','description','specialties','contact_url','website_url','status','seller_status','marketplace_enabled','stripe_account_id','stripe_charges_enabled','stripe_payouts_enabled','commission_bps','payout_policy','verified_at','profile_updated_at','created_at'] },
   { source: 'organization_members', target: 'organization_members', requiredSourceColumns: ['organization_id','user_id','role'] },
   { source: 'founder_program_state', target: 'founder_program_state', requiredSourceColumns: ['id','current_slot','updated_at'] },
