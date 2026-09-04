@@ -28,6 +28,7 @@ npm run migrate-legacy -- --inventory --scope=discovery
 npm run migrate-legacy -- --dry-run --scope=discovery
 npm run verify:discovery-rehearsal -- --inventory=<inventory-1.json> --inventory=<inventory-2.json> --dry-run=<dry-run-1.json> --dry-run=<dry-run-2.json>
 npm run verify:production-env -- --file=<private-production.env>
+npm run verify:production-db
 npm run verify:production-mail
 npm run verify:discovery-runtime -- --origin=http://127.0.0.1:4200 --migration=003_discovery_migration_scope.sql --organization=/directory/<slug> --product=/product/<slug> --media=/media/<key>.webp
 npm run verify:discovery-load -- --origin=http://127.0.0.1:4200 --organization=/directory/<slug> --product=/product/<slug> --requests=72 --concurrency=6 --timeout-ms=3000 --p95-ms=750 --output=<absolute-new.json>

@@ -74,4 +74,16 @@ describe('production discovery systemd bundle', () => {
     expect(firstTimerStart).toBeGreaterThan(loadGate);
     expect(activation).toContain('--requests=72 --concurrency=6 --timeout-ms=3000 --p95-ms=750');
   });
+
+  it('verifies the actual database identity before SMTP and schema migrations', async () => {
+    const preparation = await readFile(path.resolve('ops/deploy-production-discovery.sh'), 'utf8');
+    const environment = preparation.indexOf('verify-production-environment.js');
+    const database = preparation.indexOf('verify-production-database.js');
+    const mail = preparation.indexOf('verify-production-mail.js');
+    const migration = preparation.indexOf('dist/src/db/migrate.js');
+    expect(environment).toBeGreaterThan(-1);
+    expect(database).toBeGreaterThan(environment);
+    expect(mail).toBeGreaterThan(database);
+    expect(migration).toBeGreaterThan(mail);
+  });
 });

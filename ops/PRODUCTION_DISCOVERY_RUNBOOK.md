@@ -61,7 +61,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    npm run verify:production-env -- --file=/srv/seedexchange-production/shared/production.env
    ```
 
-   It must report `ready: true`. Create the configured media directory for the `seedexchange` service account with no public write access.
+   It must report `ready: true`. Create the configured media directory for the `seedexchange` service account with no public write access. The later preparation script also opens a read-only connection through this environment and requires the actual database, current role, owner, loopback server address and least-privilege attributes to match before SMTP verification or schema migration.
 3. Select one reviewed commit merged to `master` whose CI passed TypeScript, PostgreSQL-backed tests, build, production dependency audit and Chromium acceptance. Production artifacts are not emitted for pull requests or feature-branch pushes. Download only its `seedexchange-production-discovery-<commit>` artifact. It contains a tar archive, SHA-256 sidecar and an internal `RELEASE.json` that fingerprints every allowlisted runtime file and pins the Git commit, tree, Node major and newest migration. Record the GitHub artifact digest, archive SHA-256 and commit as one approval set.
 4. After explicit preparation approval, use the exact approved archive values:
 
