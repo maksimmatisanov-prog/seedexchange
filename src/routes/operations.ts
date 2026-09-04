@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js';
 import { canManageOrganization, canTransitionSellerOrder } from '../domain/rules.js';
 import { pageModel } from '../lib/view.js';
 import { audit } from '../services/audit.js';
+import { moderateSupplierBatch } from '../services/supplier-batches.js';
 import { assertCsrf, requireRole, requireUser } from '../services/sessions.js';
 import type { CurrentUser } from '../types/fastify.js';
 
@@ -145,5 +146,12 @@ export async function registerOperationRoutes(app: FastifyInstance) {
     const updated=await pool.query<{id:string}>('UPDATE products SET status=$1,updated_at=now() WHERE id=$2 AND status=$3 RETURNING id',[action==='approve'?'active':'rejected',request.params.id,'pending_review']);
     if (!updated.rows[0]) throw Object.assign(new Error('Pending product not found.'),{statusCode:404});
     await audit(user.id,'product',request.params.id,action==='approve'?'product.approved':'product.rejected'); return reply.redirect('/admin',303);
+  });
+
+  app.post<{Params:{id:string;action:string}}>('/admin/supplier-batch/:id/:action',async(request,reply)=>{
+    const user=requireRole(request,['platform_admin']); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf);
+    const action=z.enum(['approve','reject']).parse(request.params.action);
+    await moderateSupplierBatch(request.params.id,action,user.id);
+    return reply.redirect('/admin',303);
   });
 }

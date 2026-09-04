@@ -89,6 +89,17 @@ All operational package commands now compile and exist. Payment flags remain off
 - A discovery marketplace-worker smoke used an intentionally unreachable database URL and exited with `commerce_launch_phase_disabled`, proving that the disabled path does not require a database connection. An invalid discovery configuration with marketplace payments enabled failed during configuration loading.
 - This evidence is local only. The launch boundary has not yet been deployed to staging or production.
 
+## Oreshka supplier-feed evidence from 2026-09-04
+
+- The Node target now parses normalized JSON and Oreshka CSV feeds, caps input at 20 MB and defaults the operational command to a database-free dry run.
+- The import rejects feeds below 99% acceptance, duplicate external IDs, unsupported values, non-HTTPS links, product links outside `oreshka-seeds.com` and images outside `static.tildacdn.com` before opening a database transaction.
+- A committed staging import requires an approved organization. It marks unseen catalog rows stale, upserts normalized supplier rows, records an import report and can optionally synchronize already-published external offers.
+- Live synchronization changes only price, compare-at price, stock and source timestamp automatically. Editorial or link changes are held as `review_required`; missing feed rows remain published at zero stock with `source_sync_status='stale'`.
+- Referral URLs preserve existing query parameters and receive the `seedexchange.online / referral / oreshka_catalog` UTM tuple. CSV snapshots do not contain the import clock, so identical source data stays deterministic.
+- Unit coverage verifies normalization, CSV quoting and malformed-row reporting, the host allowlist, duplicate detection, the acceptance-rate boundary and stable referral tracking. This is local implementation evidence only; no supplier feed or staging/production database was changed.
+- An isolated PostgreSQL 14 integration run applied both migrations, committed one normalized feed row, produced the same SHA-256 snapshot in dry-run and write modes, created a one-item pending batch and activated it only after moderation. The resulting product was `active`, `external`, `current`, linked to its publication batch and carried the expected referral URL.
+- The same isolated run held an editorial title change as `review_required`, applied it only through a separate content-review batch, and rejected a later approval after the staged supplier snapshot was deliberately changed. Both preparation and moderation audit events were present. The temporary database cluster was stopped and removed afterward.
+
 ## Identity and RBAC evidence from 2026-09-03
 
 - Seller workspace authorization now follows the shared domain rule: organization administrators and platform administrators are allowed, while buyers, non-members and ordinary organization members receive 403.
