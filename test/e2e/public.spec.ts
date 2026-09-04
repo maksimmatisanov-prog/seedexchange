@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 const publicPaths = ['/', '/directory', '/marketplace', '/exchange', '/search', '/about', '/pricing', '/economics', '/terms', '/privacy'];
+const expectedLaunchPhase = process.env.PLAYWRIGHT_EXPECT_LAUNCH_PHASE ?? 'discovery';
 
 test('public pages render and local navigation is not broken', async ({ page, request }, testInfo) => {
   const localHrefs = new Set<string>();
@@ -47,4 +48,20 @@ test('home has no serious accessibility violations', async ({ page }) => {
   await page.goto('/');
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
   expect(results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''))).toEqual([]);
+});
+
+test('launch phase matches the expected public commerce boundary', async ({ page, request }) => {
+  const healthResponse = await request.get('/health');
+  expect(healthResponse.status()).toBe(200);
+  const health = await healthResponse.json() as { launchPhase: string; commerceEnabled: boolean };
+  expect(health.launchPhase).toBe(expectedLaunchPhase);
+
+  await page.goto('/');
+  if (expectedLaunchPhase === 'discovery') {
+    expect(health.commerceEnabled).toBe(false);
+    await expect(page.locator('a[href="/cart"]')).toHaveCount(0);
+    expect((await request.get('/cart')).status()).toBe(404);
+    await page.goto('/marketplace');
+    await expect(page.locator('.launch-notice')).toContainText('Seedexchange does not take payment in this phase.');
+  }
 });

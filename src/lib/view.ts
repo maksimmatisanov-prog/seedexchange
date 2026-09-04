@@ -7,6 +7,8 @@ export function pageModel(request: FastifyRequest, values: Record<string, unknow
     currentUser: request.currentUser,
     csrfToken: request.csrfToken,
     sessionData: request.sessionData,
+    launchPhase: config.LAUNCH_PHASE,
+    commerceEnabled: config.COMMERCE_ENABLED,
     ...values,
   };
 }

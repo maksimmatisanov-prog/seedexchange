@@ -9,12 +9,29 @@ import { getOrganization, getProduct, homeModel, listExchanges, listOrganization
 const slugSchema = z.string().regex(/^[a-z0-9-]{1,190}$/);
 
 export async function registerPublicRoutes(app: FastifyInstance) {
-  app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+  app.get('/health', async () => ({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    launchPhase: config.LAUNCH_PHASE,
+    commerceEnabled: config.COMMERCE_ENABLED,
+    connectEnabled: config.CONNECT_ENABLED,
+    marketplacePaymentsEnabled: config.MARKETPLACE_PAYMENTS_ENABLED,
+    payoutWorkerEnabled: config.PAYOUT_WORKER_ENABLED,
+  }));
   app.get('/ready', async (_request, reply) => {
     try {
       const result = await pool.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1');
       if (!result.rows[0]) return reply.code(503).send({ status: 'not_ready', reason: 'migrations_missing' });
-      return { status: 'ready', database: 'ok', migration: result.rows[0].version };
+      return {
+        status: 'ready',
+        database: 'ok',
+        migration: result.rows[0].version,
+        launchPhase: config.LAUNCH_PHASE,
+        commerceEnabled: config.COMMERCE_ENABLED,
+        connectEnabled: config.CONNECT_ENABLED,
+        marketplacePaymentsEnabled: config.MARKETPLACE_PAYMENTS_ENABLED,
+        payoutWorkerEnabled: config.PAYOUT_WORKER_ENABLED,
+      };
     } catch { return reply.code(503).send({ status: 'not_ready', reason: 'database_unavailable' }); }
   });
 
@@ -68,7 +85,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
   app.get('/sitemap.xml', async (_request, reply) => {
     const paths = ['/', '/directory', '/marketplace', '/exchange', '/about', '/pricing', '/economics', '/terms', '/privacy'];
     try {
-      const dynamic = await pool.query<{ path: string }>(`SELECT '/directory/'||slug path FROM organizations WHERE status='approved' UNION ALL SELECT '/product/'||slug path FROM products WHERE status='active'`);
+      const dynamic = await pool.query<{ path: string }>(`SELECT '/directory/'||slug path FROM organizations WHERE status='approved' UNION ALL SELECT '/product/'||slug path FROM products WHERE status='active' AND purchase_mode=ANY($1::text[]) AND (purchase_mode<>'external' OR external_purchase_url~*'^https://')`, [config.PUBLIC_PRODUCT_MODES]);
       paths.push(...dynamic.rows.map((row) => row.path));
     } catch { /* base sitemap remains available before the first migration */ }
     return reply.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${paths.map((item) => `<url><loc>${config.APP_URL}${item}</loc></url>`).join('')}</urlset>`);

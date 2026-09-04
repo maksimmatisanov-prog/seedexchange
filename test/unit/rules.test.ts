@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import { calculateCommissionCents, calculateShippingCents, canManageOrganization, canTransitionOrder, canTransitionSellerOrder, clampCartQuantity, effectiveCommissionBps, nextFounderSlot, reservationExpiresAt } from '../../src/domain/rules.js';
+import { commerceEnabled, publicProductModes, validateLaunchFlags, validateLaunchReadiness } from '../../src/domain/launch.js';
+
+describe('launch phase rules', () => {
+  it('keeps discovery strictly free of internal payment capabilities', () => {
+    expect(validateLaunchFlags({ launchPhase: 'discovery', connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false })).toEqual([]);
+    expect(validateLaunchFlags({ launchPhase: 'discovery', connectEnabled: true, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false })).toContain('Discovery launch phase requires Connect, marketplace payments and payouts to remain disabled.');
+    expect(commerceEnabled({ launchPhase: 'discovery', marketplacePaymentsEnabled: true })).toBe(false);
+    expect(publicProductModes(false)).toEqual(['external']);
+  });
+
+  it('requires Connect before marketplace payments and payments before payouts', () => {
+    expect(validateLaunchFlags({ launchPhase: 'commerce', connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false })).toContain('Commerce launch phase requires Stripe Connect and marketplace payments to be enabled together.');
+    expect(validateLaunchFlags({ launchPhase: 'commerce', connectEnabled: false, marketplacePaymentsEnabled: true, payoutWorkerEnabled: false })).toContain('Marketplace payments require Stripe Connect to be enabled.');
+    expect(validateLaunchFlags({ launchPhase: 'commerce', connectEnabled: true, marketplacePaymentsEnabled: false, payoutWorkerEnabled: true })).toContain('Payout worker requires marketplace payments to be enabled.');
+    expect(validateLaunchFlags({ launchPhase: 'commerce', connectEnabled: true, marketplacePaymentsEnabled: true, payoutWorkerEnabled: false })).toEqual([]);
+    expect(commerceEnabled({ launchPhase: 'commerce', marketplacePaymentsEnabled: true })).toBe(true);
+    expect(publicProductModes(true)).toEqual(['external', 'marketplace']);
+  });
+
+  it('verifies the runtime phase before a release is accepted', () => {
+    expect(validateLaunchReadiness({ status: 'ready', database: 'ok', migration: '002.sql', launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }, 'discovery')).toEqual([]);
+    expect(validateLaunchReadiness({ status: 'ready', database: 'ok', migration: '002.sql', launchPhase: 'discovery', commerceEnabled: true }, 'discovery')).toContain('Discovery readiness exposed an enabled commerce capability.');
+    expect(validateLaunchReadiness({ status: 'ready', database: 'ok', migration: '002.sql', launchPhase: 'discovery' }, 'commerce')).toContain('Expected launch phase commerce, received discovery.');
+  });
+});
 
 describe('commerce rules', () => {
   it('calculates integer commissions without rounding up', () => {

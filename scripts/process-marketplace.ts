@@ -2,6 +2,12 @@ import Stripe from 'stripe';
 import { config } from '../src/config.js';
 import { pool } from '../src/db/pool.js';
 
+if (!config.COMMERCE_ENABLED) {
+  console.log(JSON.stringify({ skipped: true, reason: 'commerce_launch_phase_disabled', launchPhase: config.LAUNCH_PHASE }));
+  await pool.end();
+  process.exit(0);
+}
+
 const expired = await pool.query(`WITH released AS (UPDATE inventory_reservations SET status='released' WHERE status='active' AND expires_at<=now() RETURNING order_id)
   UPDATE orders SET status='cancelled',updated_at=now() WHERE id IN (SELECT order_id FROM released) AND status='pending_payment' RETURNING id`);
 await pool.query(`UPDATE founder_program_members SET status='rate_expired' WHERE status='active' AND rate_expires_at<=now()`);

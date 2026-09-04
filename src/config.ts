@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import { commerceEnabled, publicProductModes, validateLaunchFlags } from './domain/launch.js';
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().default('development-only-session-secret'),
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(24 * 90).default(24 * 14),
   TRUST_PROXY: booleanFlag,
+  LAUNCH_PHASE: z.enum(['discovery', 'commerce']).default('discovery'),
   STRIPE_SECRET_KEY: z.string().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   CONNECT_ENABLED: booleanFlag,
@@ -43,16 +45,26 @@ if (!parsed.success) {
   throw new Error(`Invalid environment: ${parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`);
 }
 
+const launchErrors = validateLaunchFlags({
+  launchPhase: parsed.data.LAUNCH_PHASE,
+  connectEnabled: parsed.data.CONNECT_ENABLED,
+  marketplacePaymentsEnabled: parsed.data.MARKETPLACE_PAYMENTS_ENABLED,
+  payoutWorkerEnabled: parsed.data.PAYOUT_WORKER_ENABLED,
+});
+if (launchErrors.length) throw new Error(`Invalid launch configuration: ${launchErrors.join(' ')}`);
+
 if (parsed.data.NODE_ENV === 'production') {
   if (parsed.data.SESSION_SECRET.length < 32 || parsed.data.SESSION_SECRET.includes('development')) {
     throw new Error('SESSION_SECRET must contain at least 32 non-default characters in production.');
-  }
-  if (parsed.data.PAYOUT_WORKER_ENABLED && !parsed.data.MARKETPLACE_PAYMENTS_ENABLED) {
-    throw new Error('PAYOUT_WORKER_ENABLED requires MARKETPLACE_PAYMENTS_ENABLED.');
   }
   if (parsed.data.MARKETPLACE_PAYMENTS_ENABLED && (!parsed.data.STRIPE_SECRET_KEY || !parsed.data.STRIPE_WEBHOOK_SECRET)) {
     throw new Error('Enabled marketplace payments require Stripe secret and webhook keys.');
   }
 }
 
-export const config = parsed.data;
+const isCommerceEnabled = commerceEnabled({ launchPhase: parsed.data.LAUNCH_PHASE, marketplacePaymentsEnabled: parsed.data.MARKETPLACE_PAYMENTS_ENABLED });
+export const config = Object.freeze({
+  ...parsed.data,
+  COMMERCE_ENABLED: isCommerceEnabled,
+  PUBLIC_PRODUCT_MODES: publicProductModes(isCommerceEnabled),
+});

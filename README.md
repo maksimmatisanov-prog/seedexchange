@@ -6,7 +6,7 @@ New Node.js migration target for [seedexchange.online](https://seedexchange.onli
 
 This repository now contains the migration foundation and several end-to-end vertical slices: ordered PostgreSQL migrations, identity/session flows, public catalog and exchange reads, seller moderation workflows, cart/order reservations, disabled-by-default Stripe foundations, conversations, workers, CI and staging release templates. It is still not feature-equivalent with the live PHP/MySQL application and is not approved for production cutover.
 
-See `MIGRATION.md` for the audited gap list and migration sequence.
+See `BRIEF.md` for the product and commercial summary. See `MIGRATION.md` for the audited gap list and migration sequence.
 
 ## Local commands
 
@@ -31,6 +31,7 @@ The default local URL is `http://localhost:4000`. Configuration is read from env
 - `test/`: unit, integration and browser checks.
 - `ops/`: systemd, Caddy and immutable staging release templates.
 - `MIGRATION.md`: verified evidence, gaps and acceptance gates.
+- `BRIEF.md`: concise product brief, current stage, commercial benchmark and recommended work order.
 
 ## Legacy comparison source
 

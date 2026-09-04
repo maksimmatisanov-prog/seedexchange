@@ -21,6 +21,7 @@
     "generate-sitemap": "node dist/scripts/generate-sitemap.js",
     "send-outbox": "node dist/scripts/send-outbox.js",
     "process-marketplace": "node dist/scripts/process-marketplace.js",
+    "verify-ready": "node dist/scripts/verify-ready.js",
     "migrate-legacy": "node dist/scripts/migrate-legacy.js"
   },
   "dependencies": {

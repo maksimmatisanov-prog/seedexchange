@@ -44,7 +44,9 @@
         <li><a href="/search">Search</a></li>
       </ul>
       <div class="nav-actions">
+        <% if (commerceEnabled) { %>
         <a href="/cart" class="nav-cart">Cart</a>
+        <% } %>
         <% if (currentUser) { %>
         <a href="/account" class="button button-small">Account</a>
         <form method="post" action="/logout" class="nav-form"><input type="hidden" name="csrf" value="<%= csrfToken %>"><button class="button button-small button-secondary">Sign out</button></form>

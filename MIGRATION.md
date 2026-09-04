@@ -2,6 +2,8 @@
 
 Audit snapshot: 2026-09-02.
 
+Status refresh: 2026-09-04. The local homepage redesign passes TypeScript, Vitest, clean build and public Playwright checks. Production, DNS, staging data and payment flags were not changed.
+
 ## Baseline
 
 - Target: Fastify 5, EJS, TypeScript and PostgreSQL.
@@ -18,15 +20,19 @@ Audit snapshot: 2026-09-02.
 - Directory, marketplace, product, exchange, search, sitemap and canonical legacy query redirects.
 - Organization submission/moderation, Founder allocation, seller product/shipping/exchange workspace and admin queues.
 - Server-priced cart, seller shipping, order snapshots, seller sub-orders, reservations and disabled-by-default Stripe Checkout/webhook/transfer foundations.
+- Seller fulfilment from paid through processing, tracked shipment, buyer confirmation and delivery-case transfer holds.
 - Buyer/organization conversations, outbox delivery, reservation/transfer worker and sitemap generation.
 - Allowlisted MySQL inventory/dry-run/import command with empty-target, run fingerprint, counts and orphan checks.
 - Botanical Archive responsive UI, unit/integration/Playwright checks, PostgreSQL 16 CI and immutable staging/rollback templates.
+- Fail-closed two-stage launch contract: discovery exposes only approved HTTPS external offers and blocks cart, checkout, Stripe webhook handling and marketplace-worker mutations; commerce requires an explicit phase plus payment flags.
+- Release readiness reports the active launch phase and capability flags. The deploy verifier rejects a release when runtime readiness does not match the explicitly expected phase.
 
 ## Remaining before staging acceptance
 
 - Complete media upload/resize/storage handling with source provenance.
-- Seller fulfilment, reviews, reports, collections/journal and notification interaction screens.
+- Reviews, reports, collections/journal and complete notification interaction screens.
 - Stripe Connect onboarding, refund, partial refund, dispute, reversal and delivery-case acceptance in test mode.
+- Approve payment-cost allocation, international seed-trade restrictions, prohibited-item policy, seller service levels and support procedures.
 - Fresh production inventory and explicit legacy column/status reconciliation before any real import.
 - Two full production-snapshot migration rehearsals and full media SHA-256 verification.
 - Seeded buyer/seller/admin acceptance against staging, performance/load evidence, backup/restore drill and monitoring.
@@ -64,6 +70,24 @@ All operational package commands now compile and exist. Payment flags remain off
 - The public Playwright suite now accepts Basic Auth through dedicated environment variables rather than credentials embedded in the staging URL.
 - Remote runs use one worker and deduplicate link checks. Route-only crawling skips non-document assets, while the separate responsive-navigation and accessibility checks continue to load the complete page.
 - A clean authenticated run against `https://staging.seedexchange.online` passed 9/9 checks at 375, 768 and 1440 px, including mobile/tablet menu expansion, desktop navigation visibility, public route/link responses and serious/critical WCAG checks.
+
+## Homepage design evidence from 2026-09-03
+
+- The local homepage now develops the existing Botanical Archive direction with a light asymmetric hero, an archive-index participation section, distinct product and organization layouts, real archive totals and a restrained Founder callout. Routes, read models, SEO metadata and business logic were preserved.
+- Homepage copy and link definitions now live in `src/content/en.ts`; `src/templates/pages/home.ejs` remains structural and `public/assets/app.css` remains presentational.
+- `npm run check`, `npm run build` and Vitest passed locally. Vitest recorded 11 passing tests and one database migration test skipped without `TEST_DATABASE_URL`; the homepage integration fixture covers non-empty product and organization sections.
+- Local Playwright passed 9/9 public checks at 375, 768 and 1440 px, including responsive navigation and serious/critical WCAG checks. Local screenshots were reviewed at all three widths; the running page had no connected database, so its visual screenshots showed the valid zero-count state while non-empty dynamic markup was verified by the integration fixture.
+- This is local evidence only. No staging or production deployment, data change, payment change or traffic change was performed for the homepage redesign.
+
+## Discovery launch boundary evidence from 2026-09-04
+
+- `LAUNCH_PHASE=discovery` is the default and fails closed when Connect, marketplace payments or payouts are enabled. `LAUNCH_PHASE=commerce` requires Connect and marketplace payments to be enabled together; payouts remain a separately controlled capability.
+- Discovery public reads expose only approved external products with HTTPS purchase URLs. Cart navigation, cart mutations, checkout creation and Stripe webhook processing return unavailable responses, while the marketplace worker exits before database mutations.
+- `/health` reports the process launch phase and capability flags without depending on PostgreSQL. `/ready` additionally requires the database and migration ledger. The release verifier rejects a runtime phase or capability mismatch before activation is accepted.
+- TypeScript, Vitest and a clean build passed locally. Vitest recorded 16 passing tests and one migration test skipped without `TEST_DATABASE_URL`.
+- Local Playwright passed 12/12 public checks across 375, 768 and 1440 px, including the expected discovery phase, hidden cart, blocked cart route, external-offer notice, responsive navigation, public links and serious/critical WCAG checks. Role tests remained intentionally skipped without an isolated acceptance database.
+- A discovery marketplace-worker smoke used an intentionally unreachable database URL and exited with `commerce_launch_phase_disabled`, proving that the disabled path does not require a database connection. An invalid discovery configuration with marketplace payments enabled failed during configuration loading.
+- This evidence is local only. The launch boundary has not yet been deployed to staging or production.
 
 ## Identity and RBAC evidence from 2026-09-03
 

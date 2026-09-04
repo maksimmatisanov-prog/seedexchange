@@ -23,7 +23,7 @@ function stripeClient() {
 }
 
 export async function createCheckout(input: { userId: string | null; email: string; country: string; cart: Cart }) {
-  if (!config.MARKETPLACE_PAYMENTS_ENABLED) throw Object.assign(new Error('Marketplace checkout is not enabled.'), { statusCode: 503 });
+  if (!config.COMMERCE_ENABLED) throw Object.assign(new Error('Marketplace checkout is not enabled for this launch phase.'), { statusCode: 503 });
   const client = await pool.connect();
   let orderId = '';
   let lines: CartLine[] = [];

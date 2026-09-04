@@ -1,58 +1,90 @@
-<section class="home-hero" aria-labelledby="home-title">
-  <div class="hero-copy">
-    <p class="eyebrow">The living seed archive</p>
-    <h1 id="home-title"><%= title %></h1>
-    <p><%= description %></p>
-    <div class="hero-actions"><a class="button button-light" href="/marketplace">Explore the marketplace</a><a href="/directory">Meet the custodians</a></div>
-  </div>
-  <picture class="hero-visual"><source srcset="/assets/hero-botanical-archive-v3.webp" type="image/webp"><img src="/assets/hero-botanical-archive-v3.png" alt="Botanical archive trays with carefully documented seed packets" width="1200" height="900" fetchpriority="high"></picture>
-</section>
+<div class="home-page">
+  <section class="home-hero" aria-labelledby="home-title">
+    <div class="hero-copy">
+      <p class="eyebrow"><%= heroLabel %></p>
+      <h1 id="home-title"><%= title %></h1>
+      <p class="hero-description"><%= description %></p>
+      <div class="hero-actions">
+        <a class="button" href="/marketplace"><%= primaryAction %></a>
+        <a class="hero-secondary-action" href="/directory"><%= secondaryAction %></a>
+      </div>
+    </div>
+    <picture class="hero-visual">
+      <source srcset="/assets/hero-botanical-archive-v3.webp" type="image/webp">
+      <img src="/assets/hero-botanical-archive-v3.png" alt="Botanical archive trays with seed packets and written collection records" width="1200" height="900" fetchpriority="high">
+    </picture>
+  </section>
 
-<section class="section archive-paths">
-  <header class="editorial-heading">
-    <p class="eyebrow">Three ways to take part</p>
-    <h2>A public record built around living collections</h2>
-  </header>
-  <div class="archive-list">
-    <a class="archive-row" href="/directory">
-      <span><strong>Find custodians</strong><small>Browse approved seed banks, botanic gardens, nurseries and collectors.</small></span>
-      <span class="archive-link">Open directory</span>
-    </a>
-    <a class="archive-row" href="/exchange">
-      <span><strong>Exchange responsibly</strong><small>Contact collection owners directly about no-money exchanges and donations.</small></span>
-      <span class="archive-link">View exchange</span>
-    </a>
-    <a class="archive-row" href="/marketplace">
-      <span><strong>Order from growers</strong><small>Buy available seeds from approved sellers with seller-specific shipping and protected checkout.</small></span>
-      <span class="archive-link">Visit marketplace</span>
-    </a>
-  </div>
-</section>
+  <section class="section archive-paths" aria-labelledby="archive-paths-title">
+    <header class="editorial-heading archive-paths-heading">
+      <h2 id="archive-paths-title"><%= pathsTitle %></h2>
+    </header>
+    <div class="archive-list">
+      <% paths.forEach(function(path) { %>
+      <a class="archive-row" href="<%= path.href %>">
+        <span class="archive-row-copy">
+          <strong><%= path.title %></strong>
+          <small><%= path.description %></small>
+        </span>
+        <span class="archive-link"><%= path.action %></span>
+      </a>
+      <% }) %>
+    </div>
+  </section>
 
-<% if (products.length) { %><section class="section"><header class="editorial-heading"><h2>Recently documented accessions</h2></header><div class="product-grid"><% products.forEach(function(product){ %><%- include('../partials/product-card', { product: product }) %><% }) %></div></section><% } %>
+  <% if (products.length) { %>
+  <section class="section home-products" aria-labelledby="recent-accessions-title">
+    <header class="editorial-heading">
+      <h2 id="recent-accessions-title"><%= recentTitle %></h2>
+    </header>
+    <div class="product-grid">
+      <% products.forEach(function(product) { %>
+      <%- include('../partials/product-card', { product: product }) %>
+      <% }) %>
+    </div>
+  </section>
+  <% } %>
 
-<% if (organizations.length) { %><section class="section paper-section"><header class="editorial-heading"><h2>Collections behind the seeds</h2></header><div class="organization-grid"><% organizations.forEach(function(organization){ %><a class="organization-card" href="/directory/<%= organization.slug %>"><span><%= organization.type.replaceAll('_',' ') %> in <%= organization.country %></span><h3><%= organization.name %></h3><p><%= organization.description %></p></a><% }) %></div></section><% } %>
+  <% if (organizations.length) { %>
+  <section class="section home-organizations" aria-labelledby="home-organizations-title">
+    <header class="editorial-heading home-organizations-heading">
+      <h2 id="home-organizations-title"><%= organizationsTitle %></h2>
+    </header>
+    <div class="home-organization-list">
+      <% organizations.forEach(function(organization) { %>
+      <a class="home-organization-row" href="/directory/<%= organization.slug %>">
+        <span class="home-organization-meta"><%= organization.type.replaceAll('_',' ') %> in <%= organization.country %></span>
+        <span class="home-organization-copy">
+          <h3><%= organization.name %></h3>
+          <small><%= organization.description %></small>
+        </span>
+      </a>
+      <% }) %>
+    </div>
+  </section>
+  <% } %>
 
-<section class="archive-metrics" aria-label="Archive totals">
-  <div>
-    <strong><%= stats.organizations %></strong>
-    <span>approved organizations</span>
-  </div>
-  <div>
-    <strong><%= stats.products %></strong>
-    <span>marketplace accessions</span>
-  </div>
-  <div>
-    <strong><%= stats.exchanges %></strong>
-    <span>active exchanges</span>
-  </div>
-</section>
+  <dl class="archive-metrics" aria-label="<%= metricsLabel %>">
+    <div>
+      <dd><%= stats.organizations %></dd>
+      <dt><%= metrics.organizations %></dt>
+    </div>
+    <div>
+      <dd><%= stats.products %></dd>
+      <dt><%= metrics.products %></dt>
+    </div>
+    <div>
+      <dd><%= stats.exchanges %></dd>
+      <dt><%= metrics.exchanges %></dt>
+    </div>
+  </dl>
 
-<section class="section founder-callout">
-  <div>
-    <p class="eyebrow">Founding Organizations · first 50 approvals</p>
-    <h2>Help shape the network from its first season.</h2>
-    <p>The first 50 approved organizations receive a permanent public Founder badge. Approved sellers also receive a 7% marketplace commission for 12 months from first activation, then their standard rate applies.</p>
-  </div>
-  <a class="button" href="/register">Register an organization</a>
-</section>
+  <section class="section founder-callout" aria-labelledby="founder-title">
+    <div>
+      <p class="eyebrow"><%= founder.label %></p>
+      <h2 id="founder-title"><%= founder.title %></h2>
+      <p><%= founder.description %></p>
+    </div>
+    <a class="button" href="/register"><%= founder.action %></a>
+  </section>
+</div>
