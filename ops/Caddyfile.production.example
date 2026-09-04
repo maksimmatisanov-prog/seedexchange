@@ -1,0 +1,4 @@
+seedexchange.online, www.seedexchange.online {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:4200
+}

@@ -108,6 +108,8 @@ All operational package commands now compile and exist. Payment flags remain off
 - Inventory fingerprints now include a SHA-256 checksum of every selected source row rather than counts alone. Import parity compares each source table with its mapped target, including differently named tables in the later full scope.
 - This is a local migration-contract change. No production source was connected, inventoried or imported, and no staging data changed.
 - PostgreSQL 14 applied migrations `001`–`003` on an empty temporary database and a repeat run applied zero files. The deploy verifier now also requires `/ready` to report the latest migration bundled in the release, preventing activation on an older schema.
+- A production discovery-data verifier and cutover runbook now require a successful fingerprinted discovery import, an external-only data set, disabled organization payment capabilities, completed moderation and sitemap health before DNS activation. Production service and Caddy examples use an isolated root, database environment and loopback port rather than staging state.
+- The compiled discovery-data verifier was exercised against an isolated PostgreSQL 14 database. A migration-003 dataset with a successful discovery run, verified administrator, approved organization and active HTTPS external product returned `ready: true`; inserting one shipping row changed it to `ready: false` with `Commerce tables contain rows during discovery launch.` The temporary cluster was then stopped and removed.
 
 ## Identity and RBAC evidence from 2026-09-03
 

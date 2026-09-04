@@ -22,6 +22,7 @@
     "send-outbox": "node dist/scripts/send-outbox.js",
     "process-marketplace": "node dist/scripts/process-marketplace.js",
     "verify-ready": "node dist/scripts/verify-ready.js",
+    "verify:discovery-data": "node dist/scripts/verify-discovery-data.js",
     "sync:oreshka": "node dist/scripts/sync-oreshka.js",
     "prepare:supplier-batch": "node dist/scripts/prepare-supplier-batch.js",
     "migrate-legacy": "node dist/scripts/migrate-legacy.js"

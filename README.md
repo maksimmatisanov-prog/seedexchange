@@ -41,6 +41,7 @@ npm run prepare:supplier-batch -- --limit=200
 - `src/templates/` and `public/assets/`: EJS pages and shared design system.
 - `test/`: unit, integration and browser checks.
 - `ops/`: systemd, Caddy and immutable staging release templates.
+- `ops/PRODUCTION_DISCOVERY_RUNBOOK.md`: approval-gated phase-1 production cutover and rollback procedure.
 - `MIGRATION.md`: verified evidence, gaps and acceptance gates.
 - `BRIEF.md`: concise product brief, current stage, commercial benchmark and recommended work order.
 
