@@ -37,6 +37,8 @@ describe('two-stage legacy migration contract', () => {
   it('defines and enforces a required discovery source schema', () => {
     const plans = legacyPlansForScope('discovery');
     expect(plans.every((plan) => (plan.requiredSourceColumns?.length ?? 0) > 0)).toBe(true);
+    expect(plans.find((plan) => plan.source === 'media_assets')?.allowedTargetOnlyColumns).toEqual(['sha256']);
+    expect(plans.find((plan) => plan.source === 'products')?.allowedTargetOnlyColumns).toEqual(['publication_batch_id']);
     const available = new Set(plans.map((plan) => plan.source));
     const columns = new Map(plans.map((plan) => [plan.source, [...plan.requiredSourceColumns!]]));
     expect(validateLegacySourceContract(plans, available, columns)).toEqual([]);

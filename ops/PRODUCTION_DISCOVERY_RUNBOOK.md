@@ -47,7 +47,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    npm run migrate-legacy -- --dry-run --scope=discovery
    ```
 
-2. Require the two dry runs and the final source inventory to have identical ordered column lists, counts and fingerprints. Review every `targetOnlyColumns` entry; any `sourceOnlyColumns`, required target-only field or unreviewed schema difference blocks import.
+2. Require the two dry runs and the final source inventory to have identical ordered column lists, counts and fingerprints. Review every `targetOnlyColumns` entry; it must match the built-in allowlist (`media_assets.sha256` and `products.publication_batch_id`). Any `sourceOnlyColumns`, required target-only field or unreviewed schema difference blocks import.
 3. After explicit import approval, run exactly once:
 
    ```bash

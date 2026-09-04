@@ -102,13 +102,16 @@ async function compatibleColumns(client: PoolClient, plan: LegacyTablePlan, sour
   const targetNames = await targetColumns(client, plan.target);
   const columns = sourceNames.filter((name) => targetNames.has(name));
   const sourceOnly = sourceNames.filter((name) => !targetNames.has(name));
+  const targetOnly = [...targetNames.keys()].filter((name) => !sourceNames.includes(name));
+  const unexpectedTargetOnly = targetOnly.filter((name) => !(plan.allowedTargetOnlyColumns ?? []).includes(name));
   const targetRequiredButUnmapped = [...targetNames.entries()]
     .filter(([name, metadata]) => !sourceNames.includes(name) && !metadata.nullable && !metadata.hasDefault && !metadata.identity)
     .map(([name]) => name);
   if (sourceOnly.length) throw new Error(`Source table ${plan.source} has unmapped columns: ${sourceOnly.join(', ')}.`);
+  if (unexpectedTargetOnly.length) throw new Error(`Target table ${plan.target} has unreviewed target-only columns: ${unexpectedTargetOnly.join(', ')}.`);
   if (targetRequiredButUnmapped.length) throw new Error(`Target table ${plan.target} has required unmapped columns: ${targetRequiredButUnmapped.join(', ')}.`);
   if (!columns.length) throw new Error(`No compatible columns for ${plan.source}.`);
-  return { targetNames, columns, sourceOnly, targetOnly: [...targetNames.keys()].filter((name) => !sourceNames.includes(name)) };
+  return { targetNames, columns, sourceOnly, targetOnly };
 }
 
 async function ensureEmptyTarget(client: PoolClient, plans: LegacyTablePlan[]): Promise<void> {

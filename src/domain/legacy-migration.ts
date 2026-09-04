@@ -1,7 +1,13 @@
 import { isExternalHttpsUrl } from './public-url.js';
 
 export type LegacyMigrationScope = 'discovery' | 'full';
-export type LegacyTablePlan = { source: string; target: string; where?: string; requiredSourceColumns?: readonly string[] };
+export type LegacyTablePlan = {
+  source: string;
+  target: string;
+  where?: string;
+  requiredSourceColumns?: readonly string[];
+  allowedTargetOnlyColumns?: readonly string[];
+};
 
 function validateIdentifier(value: string): void {
   if (!/^[a-z][a-z0-9_]*$/.test(value)) throw new Error(`Unsafe identifier: ${value}`);
@@ -23,10 +29,10 @@ const sharedDiscoveryPlans: LegacyTablePlan[] = [
   { source: 'organization_members', target: 'organization_members', requiredSourceColumns: ['organization_id','user_id','role'] },
   { source: 'founder_program_state', target: 'founder_program_state', requiredSourceColumns: ['id','current_slot','updated_at'] },
   { source: 'founder_program_members', target: 'founder_program_members', requiredSourceColumns: ['organization_id','slot_number','status','awarded_at','marketplace_activated_at','rate_expires_at','revoked_at','revoked_by_user_id','founder_commission_bps'] },
-  { source: 'media_assets', target: 'media_assets', requiredSourceColumns: ['id','organization_id','uploaded_by_user_id','kind','origin','source_url','is_active','storage_key','mime_type','byte_size','width_px','height_px','created_at'] },
+  { source: 'media_assets', target: 'media_assets', requiredSourceColumns: ['id','organization_id','uploaded_by_user_id','kind','origin','source_url','is_active','storage_key','mime_type','byte_size','width_px','height_px','created_at'], allowedTargetOnlyColumns: ['sha256'] },
   { source: 'supplier_catalog_imports', target: 'supplier_catalog_imports', requiredSourceColumns: ['id','organization_id','source','status','accepted_count','rejected_count','stale_count','report','started_at','completed_at'] },
   { source: 'supplier_publication_batches', target: 'supplier_publication_batches', requiredSourceColumns: ['id','organization_id','source','batch_type','status','open_scope','item_count','error_count','snapshot_hash','report','sitemap_status','sitemap_error','sitemap_current_at','created_by_user_id','approved_by_user_id','created_at','reviewed_at'] },
-  { source: 'products', target: 'products', where: "purchase_mode='external'", requiredSourceColumns: ['id','organization_id','external_source','external_id','source_updated_at','source_sync_status','purchase_mode','external_purchase_url','sku','name','botanical_name','slug','category','description','origin_country','packet_quantity','germination_notes','hardiness_zone','price_cents','compare_at_price_cents','currency','stock_quantity','image_url','primary_media_id','compliance_flag','status','created_at','updated_at'] },
+  { source: 'products', target: 'products', where: "purchase_mode='external'", requiredSourceColumns: ['id','organization_id','external_source','external_id','source_updated_at','source_sync_status','purchase_mode','external_purchase_url','sku','name','botanical_name','slug','category','description','origin_country','packet_quantity','germination_notes','hardiness_zone','price_cents','compare_at_price_cents','currency','stock_quantity','image_url','primary_media_id','compliance_flag','status','created_at','updated_at'], allowedTargetOnlyColumns: ['publication_batch_id'] },
   { source: 'supplier_catalog_items', target: 'supplier_catalog_items', requiredSourceColumns: ['id','organization_id','source','external_id','item_group_id','sku','name','description','category','source_category','botanical_name','price_cents','compare_at_price_cents','currency','stock_quantity','packet_quantity','origin_country','compliance_flag','image_urls','external_purchase_url','source_updated_at','validation_status','validation_errors','payload','first_seen_at','last_seen_at','imported_product_id'] },
   { source: 'supplier_publication_batch_items', target: 'supplier_publication_batch_items', requiredSourceColumns: ['id','batch_id','supplier_catalog_item_id','product_id','position','action','snapshot','snapshot_hash','validation_errors','created_at'] },
   { source: 'exchange_listings', target: 'exchange_listings', requiredSourceColumns: ['id','organization_id','title','species','variety','category','origin_country','quantity_available','wants','contact_url','description','mode','status','completed_at','created_at'] },
@@ -83,6 +89,7 @@ export function legacyPlansForScope(scope: LegacyMigrationScope): LegacyTablePla
   return (scope === 'discovery' ? sharedDiscoveryPlans : fullPlans).map((plan) => ({
     ...plan,
     requiredSourceColumns: plan.requiredSourceColumns ? [...plan.requiredSourceColumns] : undefined,
+    allowedTargetOnlyColumns: plan.allowedTargetOnlyColumns ? [...plan.allowedTargetOnlyColumns] : undefined,
   }));
 }
 
