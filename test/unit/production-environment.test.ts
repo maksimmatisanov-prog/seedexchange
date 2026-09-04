@@ -11,7 +11,7 @@ const valid = {
   PORT: '4200',
   APP_URL: 'https://seedexchange.online',
   TRUST_PROXY: '1',
-  DATABASE_URL: 'postgresql:///seedexchange_production?host=/var/run/postgresql',
+  DATABASE_URL: 'postgresql://seedexchange_production:a-private-db-secret-1234567890@127.0.0.1:5432/seedexchange_production',
   SESSION_SECRET: 'a-secure-random-session-value-1234567890',
   LAUNCH_PHASE: 'discovery',
   CONNECT_ENABLED: '0',
@@ -47,10 +47,24 @@ describe('phase-1 production environment contract', () => {
     expect(errors).toEqual(expect.arrayContaining([
       'LAUNCH_PHASE must match the phase-1 production contract.',
       'MARKETPLACE_PAYMENTS_ENABLED must match the phase-1 production contract.',
-      'DATABASE_URL must use a local transport, the seedexchange_production database and a non-superuser role.',
+      'DATABASE_URL must use the seedexchange_production role and database with a private password over 127.0.0.1:5432.',
       'Stripe secrets must be absent during the discovery launch.',
       'LEGACY_MYSQL_URL must not remain in the production runtime environment.',
     ]));
+  });
+
+  it('rejects peer authentication, missing credentials and connection overrides', () => {
+    for (const DATABASE_URL of [
+      'postgresql:///seedexchange_production?host=/var/run/postgresql',
+      'postgresql://seedexchange_production@127.0.0.1:5432/seedexchange_production',
+      'postgresql://seedexchange:a-private-db-secret-1234567890@127.0.0.1:5432/seedexchange_production',
+      'postgresql://seedexchange_production:REPLACE_WITH_PASSWORD@127.0.0.1:5432/seedexchange_production',
+      'postgresql://seedexchange_production:a-private-db-secret-1234567890@127.0.0.1:5432/seedexchange_production?host=/var/run/postgresql',
+    ]) {
+      expect(validateDiscoveryProductionEnvironment({ ...valid, DATABASE_URL })).toContain(
+        'DATABASE_URL must use the seedexchange_production role and database with a private password over 127.0.0.1:5432.',
+      );
+    }
   });
 
   it('rejects placeholder secrets and incomplete SMTP', () => {

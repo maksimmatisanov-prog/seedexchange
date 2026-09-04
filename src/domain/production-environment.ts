@@ -17,10 +17,14 @@ function isLocalProductionDatabase(value: string): boolean {
     const url = new URL(value);
     if (!['postgres:', 'postgresql:'].includes(url.protocol)) return false;
     const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
-    const socketHost = url.searchParams.get('host');
-    const localTransport = ['127.0.0.1', 'localhost', '::1'].includes(url.hostname)
-      || socketHost === '/var/run/postgresql';
-    return localTransport && database === 'seedexchange_production' && url.username.toLowerCase() !== 'postgres';
+    const password = decodeURIComponent(url.password);
+    return url.hostname === '127.0.0.1'
+      && (url.port === '' || url.port === '5432')
+      && url.username === 'seedexchange_production'
+      && password.length >= 24
+      && !/replace|example|password/i.test(password)
+      && database === 'seedexchange_production'
+      && url.search === '';
   } catch {
     return false;
   }
@@ -32,7 +36,7 @@ export function validateDiscoveryProductionEnvironment(environment: Readonly<Rec
     if (environment[name] !== expected) errors.push(`${name} must match the phase-1 production contract.`);
   }
   if (!isLocalProductionDatabase(environment.DATABASE_URL ?? '')) {
-    errors.push('DATABASE_URL must use a local transport, the seedexchange_production database and a non-superuser role.');
+    errors.push('DATABASE_URL must use the seedexchange_production role and database with a private password over 127.0.0.1:5432.');
   }
   const sessionSecret = environment.SESSION_SECRET ?? '';
   if (sessionSecret.length < 32 || /development|replace|example/i.test(sessionSecret)) {

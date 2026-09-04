@@ -60,13 +60,15 @@ fi
 
 production_database=unknown
 production_role=unknown
-production_role_superuser=unknown
+production_role_can_login=unknown
+production_role_elevated=unknown
 production_database_owner=unknown
 if [[ "$EUID" -eq 0 ]] && command -v sudo >/dev/null 2>&1 && command -v psql >/dev/null 2>&1; then
   production_database=$(sudo -u postgres -- psql -d postgres -Atqc "SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_database WHERE datname = 'seedexchange_production') THEN 'present' ELSE 'missing' END" 2>/dev/null || printf unknown)
   production_role=$(sudo -u postgres -- psql -d postgres -Atqc "SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'seedexchange_production') THEN 'present' ELSE 'missing' END" 2>/dev/null || printf unknown)
   if [[ "$production_role" == "present" ]]; then
-    production_role_superuser=$(sudo -u postgres -- psql -d postgres -Atqc "SELECT CASE WHEN rolsuper THEN 'yes' ELSE 'no' END FROM pg_roles WHERE rolname = 'seedexchange_production'" 2>/dev/null || printf unknown)
+    production_role_can_login=$(sudo -u postgres -- psql -d postgres -Atqc "SELECT CASE WHEN rolcanlogin THEN 'yes' ELSE 'no' END FROM pg_roles WHERE rolname = 'seedexchange_production'" 2>/dev/null || printf unknown)
+    production_role_elevated=$(sudo -u postgres -- psql -d postgres -Atqc "SELECT CASE WHEN rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls THEN 'yes' ELSE 'no' END FROM pg_roles WHERE rolname = 'seedexchange_production'" 2>/dev/null || printf unknown)
   fi
   if [[ "$production_database" == "present" ]]; then
     production_database_owner=$(sudo -u postgres -- psql -d postgres -Atqc "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'seedexchange_production'" 2>/dev/null || printf unknown)
@@ -74,7 +76,8 @@ if [[ "$EUID" -eq 0 ]] && command -v sudo >/dev/null 2>&1 && command -v psql >/d
 fi
 report production_database "$production_database"
 report production_role "$production_role"
-report production_role_superuser "$production_role_superuser"
+report production_role_can_login "$production_role_can_login"
+report production_role_elevated "$production_role_elevated"
 report production_database_owner "$production_database_owner"
 
 report production_root "$(presence "$production_root")"
@@ -102,7 +105,8 @@ require_foundation() {
     reject production_database_missing
   fi
   if [[ "$production_role" == "present" ]]; then
-    [[ "$production_role_superuser" == "no" ]] || reject production_role_must_not_be_superuser
+    [[ "$production_role_can_login" == "yes" ]] || reject production_role_must_allow_login
+    [[ "$production_role_elevated" == "no" ]] || reject production_role_must_not_be_elevated
   else
     reject production_role_missing
   fi

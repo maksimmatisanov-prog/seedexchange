@@ -20,7 +20,8 @@ describe('production host preflight', () => {
     expect(script).toContain('/srv/seedexchange');
     expect(script).toContain("datname = 'seedexchange_production'");
     expect(script).toContain("rolname = 'seedexchange_production'");
-    expect(script).toContain('production_role_must_not_be_superuser');
+    expect(script).toContain('production_role_must_allow_login');
+    expect(script).toContain('production_role_must_not_be_elevated');
     expect(script).toContain("import /etc/caddy/sites-enabled/*.caddy");
     expect(script).toContain("sport = :4200");
   });
@@ -43,6 +44,6 @@ describe('production host preflight', () => {
     expect(script).not.toMatch(/\b(?:mkdir|install|createdb|createuser|dropdb|dropuser|rm|mv|cp|chmod|chown)\b/);
     expect(script).not.toMatch(/systemctl\s+(?:start|restart|enable|disable|stop|daemon-reload)/);
     expect(script).not.toMatch(/caddy\s+reload/);
-    expect(script).not.toMatch(/psql[^\n]*(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE)/i);
+    expect(script).not.toMatch(/psql[^\n]*\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE)\b/i);
   });
 });

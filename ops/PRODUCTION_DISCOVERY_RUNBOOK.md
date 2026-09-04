@@ -54,7 +54,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 ## 3. Prepare the isolated Node production target
 
 1. Create `/srv/seedexchange-production/{releases,shared/storage}` and a dedicated PostgreSQL database/role. Do not reuse `/srv/seedexchange` staging.
-2. Copy `ops/production.env.example` to `shared/production.env`, replace every placeholder privately and restrict it to the service account. Use the dedicated `seedexchange_production` PostgreSQL database and a non-superuser local role; never retain `LEGACY_MYSQL_URL` or Stripe secrets in the runtime file. Validate it before service installation:
+2. Copy `ops/production.env.example` to `shared/production.env`, replace every placeholder privately and restrict it to the service account. Use the dedicated login role and database named `seedexchange_production`; the role must have a strong URL-encoded password and no superuser, role/database creation, replication or row-security-bypass attributes. Connect only over `127.0.0.1:5432`; do not rely on the staging service account's Unix peer identity. Never retain `LEGACY_MYSQL_URL` or Stripe secrets in the runtime file. Validate it before service installation:
 
    ```bash
    ssh root@<approved-vps-ip> 'bash -s -- --expect=foundation' < ops/verify-production-host.sh
