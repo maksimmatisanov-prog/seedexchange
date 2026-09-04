@@ -56,6 +56,18 @@ The release contract has two explicit phases:
 
 This is not approved for production cutover. `MIGRATION.md` is the source of truth for verified evidence and remaining acceptance gates.
 
+## Verified status snapshot
+
+As of 2026-09-04:
+
+- The working branch is `codex/discovery-launch`; including this status update, it contains 34 local commits beyond `origin/master` and has not been pushed. The latest application change is `4676b5c`.
+- Local TypeScript, the clean build and 96 Vitest checks pass. One PostgreSQL-backed migration test is skipped when `TEST_DATABASE_URL` is not configured. Chromium public acceptance most recently passed 13 checks with two deliberate duplicate-viewport skips.
+- The immutable discovery release manifest verifies 302 allowlisted files, pins migration `003_discovery_migration_scope.sql` and contains no runtime `node_modules`.
+- Read-only public checks still identify the Hostinger PHP application. DNS still resolves through the existing Hostinger/CDN addresses, not the intended VPS cutover address.
+- Read-only VPS preflight confirms Node 24, the `seedexchange` service account, active PostgreSQL and Caddy, the existing isolated staging root `/srv/seedexchange`, and a free production loopback port `4200`.
+- The dedicated production root `/srv/seedexchange-production`, PostgreSQL database/role `seedexchange_production`, private production environment and all five production systemd units do not yet exist. No production preparation has started.
+- No production database, files, services, Caddy configuration, DNS, traffic, payment flags or marketplace state were changed while producing this snapshot.
+
 ## Decisions required before payments
 
 1. Which legal entity operates the marketplace and which seller agreement applies.
@@ -70,11 +82,12 @@ These are owner and legal decisions. Code must implement the approved policy rat
 
 ## Recommended work order
 
-1. Review and explicitly approve export of the local discovery commits to GitHub; no push has been performed for this branch.
-2. Deploy the reviewed discovery release to the closed staging endpoint, configure persistent media storage and repeat the public, RBAC, organization, exchange and upload acceptance checks.
+1. Review the 34 local discovery commits and explicitly approve `git push origin codex/discovery-launch`. A push publishes code only; it does not deploy or change production.
+2. After CI succeeds and a reviewed commit is merged to `master`, deploy that immutable discovery release to the closed staging endpoint, configure persistent media storage and repeat public, RBAC, organization, exchange and upload acceptance.
 3. Take a fresh read-only legacy production inventory and approve the field-by-field discovery import contract.
 4. Run two complete production-snapshot discovery migration rehearsals, save two inventory and two dry-run reports with distinct run IDs, pass the offline rehearsal verifier, and include database parity, media manifests/SHA-256, sitemap output and restore evidence.
-5. Complete phase-1 staging operational acceptance: validated isolated production environment, administrator moderation, SMTP, monitoring, performance, backup/restore and rollback drill.
-6. Make a separate owner decision on production Caddy/DNS cutover, followed by live verification and the observation window.
-7. Only after phase 1 is accepted, finish the deferred community screens and approve the legal/payment policy for phase 2.
-8. Accept Stripe Connect, checkout, refunds, disputes, reversals and payout behavior in test mode before any commerce activation request.
+5. Grant a separate production-foundation approval before creating `/srv/seedexchange-production`, the dedicated non-superuser database/role and the private environment. This approval must not include import, service activation, Caddy, DNS or payments.
+6. Complete phase-1 operational acceptance: administrator moderation, SMTP preflight, monitoring, bounded performance evidence, backup/restore and rollback drill. Install and activate production units only under their later, separate approvals.
+7. Make separate owner decisions on production Caddy and DNS cutover, then run public verification and the observation window.
+8. Only after phase 1 is accepted, finish the deferred community screens and approve the legal/payment policy for phase 2.
+9. Accept Stripe Connect, checkout, refunds, disputes, reversals and payout behavior in test mode before any commerce activation request.
