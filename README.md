@@ -58,6 +58,7 @@ npm run manifest:media -- --root=<restored-legacy-uploads> --output=<secure-mani
 - `test/`: unit, integration and browser checks.
 - `ops/`: systemd, Caddy, staging deployment and separately approval-gated production discovery preparation/activation.
 - `ops/verify-production-host.sh`: dependency-free read-only preflight for the clean, foundation and units-installed production host states.
+- `ops/prepare-production-foundation.sh`: separately approval-gated creation of the isolated production directories and least-privilege PostgreSQL role/database; it performs no deploy, import, service, routing or payment action.
 - `ops/caddy/`: release-manifested production fragment plus separate approval-gated activation and rollback scripts; neither script changes DNS.
 - `ops/systemd/production/`: release-manifested phase-1 units for web, outbox and sitemap only; no marketplace worker.
 - `ops/PRODUCTION_DISCOVERY_RUNBOOK.md`: approval-gated phase-1 production cutover and rollback procedure.

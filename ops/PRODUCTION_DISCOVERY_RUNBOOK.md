@@ -53,8 +53,14 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 
 ## 3. Prepare the isolated Node production target
 
-1. Create `/srv/seedexchange-production/{releases,shared/storage}` and a dedicated PostgreSQL database/role. Do not reuse `/srv/seedexchange` staging.
-2. Copy `ops/production.env.example` to `shared/production.env`, replace every placeholder privately and restrict it to the service account. Use the dedicated login role and database named `seedexchange_production`; the role must have a strong URL-encoded password and no superuser, role/database creation, replication or row-security-bypass attributes. Connect only over `127.0.0.1:5432`; do not rely on the staging service account's Unix peer identity. Never retain `LEGACY_MYSQL_URL` or Stripe secrets in the runtime file. Validate it before service installation:
+1. After a distinct production-foundation approval, create a root-owned mode-`0600` file under `/secure` containing only a new 32–128 character URL-safe database password. From the exact reviewed workstation checkout, stream the guarded script to the VPS:
+
+   ```bash
+   ssh root@<approved-vps-ip> 'SEEDX_PRODUCTION_FOUNDATION_APPROVED=YES bash -s -- /secure/root-only-db-password' < ops/prepare-production-foundation.sh
+   ```
+
+   The script rechecks the clean host state, creates only `/srv/seedexchange-production`, the login role/database `seedexchange_production` and the persistent storage directories, then proves a least-privilege TCP password login. Any failure removes only resources created by that run. It does not create the runtime environment, install a release or unit, import data, start a service, change Caddy/DNS or enable payments. Securely remove the one-purpose password file only after its value has been installed into the private runtime environment and the foundation/DB gates pass.
+2. Copy `ops/production.env.example` to a separate root-only file under `/secure`, replace every placeholder privately, insert the same database password without re-encoding (the foundation script accepts URL-safe characters only), then install it as `/srv/seedexchange-production/shared/production.env` owned by `root:seedexchange` with mode `0640`. Use the dedicated login role and database named `seedexchange_production`; the role must have no superuser, role/database creation, replication or row-security-bypass attributes. Connect only over `127.0.0.1:5432`; do not rely on the staging service account's Unix peer identity. Never retain `LEGACY_MYSQL_URL` or Stripe secrets in the runtime file. Validate it before service installation:
 
    ```bash
    ssh root@<approved-vps-ip> 'bash -s -- --expect=foundation' < ops/verify-production-host.sh
