@@ -227,6 +227,15 @@ button, input, select, textarea { font: inherit; }
 .product-card-meta span { color: var(--muted); }
 .organization-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
 .organization-card { padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; color: var(--ink); text-decoration: none; }
+.organization-card-logo,.home-organization-logo,.organization-profile-logo,.organization-logo-preview { object-fit: cover; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); }
+.organization-card-logo { width: 64px; height: 64px; margin-bottom: 16px; }
+.home-organization-logo { width: 56px; height: 56px; }
+.organization-cover { width: var(--container); max-height: 520px; margin: 48px auto 0; overflow: hidden; border-radius: 16px; }
+.organization-cover img,.organization-cover-preview { width: 100%; height: 100%; object-fit: cover; }
+.organization-profile-logo,.organization-logo-preview { width: 120px; height: 120px; margin-bottom: 20px; }
+.organization-media-editor { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.organization-media-editor article { display: grid; gap: 18px; align-content: start; }
+.organization-cover-preview { max-height: 220px; border-radius: 10px; }
 .organization-card span,.organization-card small { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .organization-card h2,.organization-card h3 { margin: 12px 0; }
 .organization-card p { color: var(--muted); }
@@ -336,7 +345,8 @@ textarea { min-height: 120px; resize: vertical; }
   .founder-callout { grid-template-columns: 1fr; margin-top: 48px; margin-bottom: 48px; text-align: left; }
   .founder-callout .button { justify-self: stretch; justify-content: center; white-space: normal; }
   .section { padding: 48px 16px; }
-  .product-grid,.organization-grid,.exchange-grid,.filter-panel,.search-form,.profile-hero,.product-detail,.form-page { grid-template-columns: 1fr; }
+  .product-grid,.organization-grid,.organization-media-editor,.exchange-grid,.filter-panel,.search-form,.profile-hero,.product-detail,.form-page { grid-template-columns: 1fr; }
+  .organization-cover { width: calc(100% - 32px); margin-top: 24px; }
   .profile-hero,.product-detail,.form-page { padding: 48px 16px; gap: 32px; }
   .empty-state { padding: 36px 20px; }
 }

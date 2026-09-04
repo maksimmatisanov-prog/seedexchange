@@ -53,7 +53,7 @@
     <div class="home-organization-list">
       <% organizations.forEach(function(organization) { %>
       <a class="home-organization-row" href="/directory/<%= organization.slug %>">
-        <span class="home-organization-meta"><%= organization.type.replaceAll('_',' ') %> in <%= organization.country %></span>
+        <span class="home-organization-meta"><% if (organization.logo_key) { %><img class="home-organization-logo" src="/media/<%= organization.logo_key %>" alt="" width="64" height="64" loading="lazy"><% } %><%= organization.type.replaceAll('_',' ') %> in <%= organization.country %></span>
         <span class="home-organization-copy">
           <h3><%= organization.name %></h3>
           <small><%= organization.description %></small>

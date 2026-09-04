@@ -29,7 +29,7 @@ Status refresh: 2026-09-04. The local homepage redesign passes TypeScript, Vites
 
 ## Remaining before staging acceptance
 
-- Complete media upload/resize/storage handling with source provenance.
+- Rehearse migrated-media copy/manifests and backup/restore handling on the isolated production target.
 - Reviews, reports, collections/journal and complete notification interaction screens.
 - Stripe Connect onboarding, refund, partial refund, dispute, reversal and delivery-case acceptance in test mode.
 - Approve payment-cost allocation, international seed-trade restrictions, prohibited-item policy, seller service levels and support procedures.
@@ -121,6 +121,16 @@ All operational package commands now compile and exist. Payment flags remain off
 - TypeScript and Vitest passed locally. Vitest recorded 33 passing tests and one migration test skipped without `TEST_DATABASE_URL`; coverage includes URL normalization, hostile/wrong-domain rejection, public organization exchange rendering and direct discovery requests to five commerce mutation routes.
 - An isolated PostgreSQL 14 run applied migrations `001`–`003` and passed 16 browser checks: 12 public responsive/accessibility/launch-boundary checks plus buyer/member/seller RBAC and the discovery organization workflow. The workflow verified persisted profile fields, normalized channels, a public exchange listing, public rendering, withdrawal and four audit events; commerce forms stayed absent. Twenty commerce/responsive role permutations were intentionally skipped. The temporary cluster was stopped and removed.
 - This is local implementation evidence. No staging or production state was changed.
+
+## Organization media pipeline from 2026-09-04
+
+- Discovery organization administrators can upload and remove a public logo or cover without enabling commerce. Uploads remain RBAC- and CSRF-protected and accept one JPG, PNG or WebP file up to the configured 5 MB limit.
+- Sharp decodes the actual image content, rejects unsupported formats and dimensions outside 32–6000 px, applies orientation, bounds logos to 800×800 and covers to 2400×1600 without enlargement, then emits WebP at quality 84.
+- Files use random 40-hex immutable keys and atomic temporary-file promotion. PostgreSQL records the uploader, organization, kind, `uploaded` provenance, WebP MIME type, byte size, dimensions and SHA-256. A database failure removes the newly written file; replacing/removing an asset deactivates the prior row and records an audit event.
+- Public media requests accept only the generated key shape and serve from the configured media root with immutable caching. Public organization read models select only active valid keys; profile, directory and home templates render the selected media.
+- Vitest passed 35 tests with one migration test skipped without `TEST_DATABASE_URL`, including real Sharp conversion, size bounds, fingerprinting, file cleanup, invalid image and SVG rejection. The complete local build passed.
+- An isolated PostgreSQL 14 and isolated media directory passed the 16-test discovery browser run. It verified a real PNG upload, 800×600 WebP metadata, SHA-256, public image response, profile rendering, logical removal and the corresponding audit events. The temporary database, media directory and listeners were removed afterward.
+- The production service/runbook now requires an explicit persistent `MEDIA_ROOT` under the dedicated production shared storage. Migrated media manifest/copy and backup/restore rehearsals remain required before cutover; no staging or production media changed.
 
 ## Identity and RBAC evidence from 2026-09-03
 

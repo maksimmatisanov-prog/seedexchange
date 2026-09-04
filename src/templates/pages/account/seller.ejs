@@ -20,6 +20,24 @@
   </form>
 </section>
 
+<section class="section workspace" id="media">
+  <h2>Profile images</h2>
+  <div class="organization-media-editor">
+    <article class="panel">
+      <h3>Logo</h3>
+      <% if (organization.logo_key) { %><img class="organization-logo-preview" src="/media/<%= organization.logo_key %>" alt="Current <%= organization.name %> logo"><% } %>
+      <form class="form" method="post" action="/seller/organization/<%= organization.id %>/media" enctype="multipart/form-data"><input type="hidden" name="csrf" value="<%= csrfToken %>"><input type="hidden" name="kind" value="organization_logo"><label>JPG, PNG or WebP, max 5 MB<input type="file" name="image" accept="image/jpeg,image/png,image/webp" required></label><button class="button">Upload logo</button></form>
+      <% if (organization.logo_key) { %><form method="post" action="/seller/organization/<%= organization.id %>/media/organization_logo/remove"><input type="hidden" name="csrf" value="<%= csrfToken %>"><button>Remove current logo</button></form><% } %>
+    </article>
+    <article class="panel">
+      <h3>Cover image</h3>
+      <% if (organization.cover_key) { %><img class="organization-cover-preview" src="/media/<%= organization.cover_key %>" alt="Current <%= organization.name %> cover"><% } %>
+      <form class="form" method="post" action="/seller/organization/<%= organization.id %>/media" enctype="multipart/form-data"><input type="hidden" name="csrf" value="<%= csrfToken %>"><input type="hidden" name="kind" value="organization_cover"><label>JPG, PNG or WebP, max 5 MB<input type="file" name="image" accept="image/jpeg,image/png,image/webp" required></label><button class="button">Upload cover</button></form>
+      <% if (organization.cover_key) { %><form method="post" action="/seller/organization/<%= organization.id %>/media/organization_cover/remove"><input type="hidden" name="csrf" value="<%= csrfToken %>"><button>Remove current cover</button></form><% } %>
+    </article>
+  </div>
+</section>
+
 <section class="section workspace" id="channels">
   <h2>Public contact channels</h2>
   <p>Only official HTTPS profile links are accepted. Email is stored as a public mail link.</p>

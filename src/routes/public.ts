@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import path from 'node:path';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { content } from '../content/en.js';
@@ -9,6 +10,10 @@ import { getOrganization, getProduct, homeModel, listExchanges, listOrganization
 const slugSchema = z.string().regex(/^[a-z0-9-]{1,190}$/);
 
 export async function registerPublicRoutes(app: FastifyInstance) {
+  app.get<{ Params: { key: string } }>('/media/:key', async (request, reply) => {
+    const key = z.string().regex(/^[a-f0-9]{40}\.webp$/).parse(request.params.key);
+    return reply.sendFile(key, path.resolve(config.MEDIA_ROOT), { immutable: true, maxAge: '1y' });
+  });
   app.get('/health', async () => ({
     status: 'ok',
     timestamp: new Date().toISOString(),

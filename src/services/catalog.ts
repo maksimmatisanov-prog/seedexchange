@@ -2,7 +2,7 @@ import { config } from '../config.js';
 import { pool } from '../db/pool.js';
 import { ORGANIZATION_CHANNELS, normalizeOrganizationChannel, normalizePublicHttpUrl, type OrganizationChannel } from '../domain/organization.js';
 
-export type OrganizationCard = { id: string; name: string; slug: string; type: string; country: string; description: string; specialties: string | null; founder_slot: number | null };
+export type OrganizationCard = { id: string; name: string; slug: string; type: string; country: string; description: string; specialties: string | null; founder_slot: number | null; logo_key: string | null };
 export type ProductCard = { id: string; name: string; botanical_name: string | null; slug: string; category: string | null; price_cents: string; compare_at_price_cents: string | null; currency: string; stock_quantity: number; image_url: string | null; purchase_mode: string; external_purchase_url: string | null; organization_name: string; organization_slug: string };
 export type ExchangeCard = { id: string; title: string; species: string | null; variety: string | null; category: string | null; origin_country: string | null; quantity_available: string | null; wants: string | null; contact_url: string | null; mode: string; description: string; organization_name: string; organization_slug: string };
 
@@ -31,7 +31,8 @@ export async function homeModel() {
 }
 
 export async function listOrganizations(limit = 48): Promise<OrganizationCard[]> {
-  const result = await pool.query<OrganizationCard>(`SELECT o.id,o.name,o.slug,o.type,o.country,o.description,o.specialties,f.slot_number founder_slot
+  const result = await pool.query<OrganizationCard>(`SELECT o.id,o.name,o.slug,o.type,o.country,o.description,o.specialties,f.slot_number founder_slot,
+    (SELECT storage_key FROM media_assets WHERE organization_id=o.id AND kind='organization_logo' AND is_active=true AND storage_key~'^[a-f0-9]{40}\\.webp$' ORDER BY (origin='uploaded') DESC,id DESC LIMIT 1) logo_key
     FROM organizations o LEFT JOIN founder_program_members f ON f.organization_id=o.id AND f.status<>'revoked'
     WHERE o.status='approved' ORDER BY f.slot_number NULLS LAST,o.name LIMIT $1`, [limit]);
   return result.rows;
@@ -39,6 +40,8 @@ export async function listOrganizations(limit = 48): Promise<OrganizationCard[]>
 
 export async function getOrganization(slug: string) {
   const result = await pool.query(`SELECT o.*,f.slot_number founder_slot,
+    (SELECT storage_key FROM media_assets WHERE organization_id=o.id AND kind='organization_logo' AND is_active=true AND storage_key~'^[a-f0-9]{40}\\.webp$' ORDER BY (origin='uploaded') DESC,id DESC LIMIT 1) logo_key,
+    (SELECT storage_key FROM media_assets WHERE organization_id=o.id AND kind='organization_cover' AND is_active=true AND storage_key~'^[a-f0-9]{40}\\.webp$' ORDER BY (origin='uploaded') DESC,id DESC LIMIT 1) cover_key,
     (SELECT count(*) FROM products p WHERE p.organization_id=o.id AND p.status='active' AND p.purchase_mode=ANY($2::text[]) AND (p.purchase_mode<>'external' OR p.external_purchase_url~*'^https://')) product_count
     FROM organizations o LEFT JOIN founder_program_members f ON f.organization_id=o.id AND f.status<>'revoked'
     WHERE o.slug=$1 AND o.status='approved'`, [slug, config.PUBLIC_PRODUCT_MODES]);

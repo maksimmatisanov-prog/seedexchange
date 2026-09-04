@@ -34,7 +34,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 ## 3. Prepare the isolated Node production target
 
 1. Create `/srv/seedexchange-production/{releases,shared/storage}` and a dedicated PostgreSQL database/role. Do not reuse `/srv/seedexchange` staging.
-2. Create `shared/production.env` privately with `HOST=127.0.0.1`, `PORT=4200`, `APP_URL=https://seedexchange.online` and all discovery flags disabled.
+2. Create `shared/production.env` privately with `HOST=127.0.0.1`, `PORT=4200`, `APP_URL=https://seedexchange.online`, `MEDIA_ROOT=/srv/seedexchange-production/shared/storage/media` and all discovery flags disabled. Create that media directory for the `seedexchange` service account with no public write access.
 3. Extract the exact reviewed GitHub/CI artifact into an immutable release, verify its SHA-256, run `npm ci`, `npm run check`, `npm test`, `npm run build` and `npm prune --omit=dev`.
 4. Apply the ordered PostgreSQL migrations. `/ready` must report the latest migration bundled in the artifact.
 5. Copy required first-party media into `shared/storage` and verify the complete file manifest by path, size and SHA-256. External Oreshka images remain HTTPS URLs and are not copied.
@@ -61,7 +61,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 ## 5. Private runtime acceptance
 
 1. Install the production systemd unit but keep Caddy and DNS unchanged. Start the Node service on loopback port 4200.
-2. Verify `/health`, `/ready`, `/`, `/directory`, representative organizations, `/marketplace`, representative external products, `/exchange`, `/robots.txt`, `/sitemap.xml`, static assets and a 404 using a local Host header.
+2. Verify `/health`, `/ready`, `/`, `/directory`, representative organizations, organization logo/cover media responses, `/marketplace`, representative external products, `/exchange`, `/robots.txt`, `/sitemap.xml`, static assets and a 404 using a local Host header.
 3. Confirm cart, cart mutations, checkout and Stripe webhook routes remain unavailable in discovery.
 4. Verify administrator login and batch moderation without creating orders or enabling payment flags.
 5. Run responsive and accessibility checks at 375, 768 and 1440 px. Inspect logs and resource usage.

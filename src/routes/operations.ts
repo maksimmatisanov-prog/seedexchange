@@ -6,6 +6,7 @@ import { ORGANIZATION_CHANNELS, ORGANIZATION_CHANNEL_LABELS, normalizeOrganizati
 import { canManageOrganization, canTransitionSellerOrder } from '../domain/rules.js';
 import { pageModel } from '../lib/view.js';
 import { audit } from '../services/audit.js';
+import { processOrganizationImage, removeUncommittedImage } from '../services/media.js';
 import { moderateSupplierBatch } from '../services/supplier-batches.js';
 import { assertCsrf, requireRole, requireUser } from '../services/sessions.js';
 import type { CurrentUser } from '../types/fastify.js';
@@ -15,7 +16,10 @@ function requireCommerceLaunch(): void {
   if (!config.COMMERCE_ENABLED) throw Object.assign(new Error('This commerce operation is unavailable during the discovery launch.'), { statusCode: 404 });
 }
 async function requireOrganization(user: CurrentUser, organizationId: string) {
-  const result = await pool.query(`SELECT o.*,m.role member_role FROM organizations o
+  const result = await pool.query(`SELECT o.*,m.role member_role,
+    (SELECT storage_key FROM media_assets WHERE organization_id=o.id AND kind='organization_logo' AND is_active=true AND storage_key~'^[a-f0-9]{40}\\.webp$' ORDER BY (origin='uploaded') DESC,id DESC LIMIT 1) logo_key,
+    (SELECT storage_key FROM media_assets WHERE organization_id=o.id AND kind='organization_cover' AND is_active=true AND storage_key~'^[a-f0-9]{40}\\.webp$' ORDER BY (origin='uploaded') DESC,id DESC LIMIT 1) cover_key
+    FROM organizations o
     LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=$2
     WHERE o.id=$1`, [organizationId, user.id]);
   const organization = result.rows[0];
@@ -23,6 +27,21 @@ async function requireOrganization(user: CurrentUser, organizationId: string) {
     throw Object.assign(new Error('Organization access denied.'), { statusCode: 403 });
   }
   return organization;
+}
+
+async function readOrganizationMediaForm(request: Parameters<typeof assertCsrf>[0]) {
+  if (!request.isMultipart()) throw Object.assign(new Error('Use a multipart image upload form.'), { statusCode: 400 });
+  const fields: Record<string, string> = {};
+  let image: Buffer | null = null;
+  for await (const part of request.parts()) {
+    if (part.type === 'file') {
+      if (image) throw Object.assign(new Error('Upload one image at a time.'), { statusCode: 400 });
+      image = await part.toBuffer();
+    } else {
+      fields[part.fieldname] = String(part.value ?? '');
+    }
+  }
+  return { fields, image };
 }
 
 export async function registerOperationRoutes(app: FastifyInstance) {
@@ -88,6 +107,41 @@ export async function registerOperationRoutes(app: FastifyInstance) {
     }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
     await audit(user.id,'organization',request.params.id,'organization.channels_updated');
     return reply.redirect(`/seller/organization/${request.params.id}#channels`,303);
+  });
+
+  app.post<{ Params: { id: string } }>('/seller/organization/:id/media', async (request, reply) => {
+    const user=requireUser(request); await requireOrganization(user,request.params.id);
+    const upload=await readOrganizationMediaForm(request);
+    const form=z.object({csrf:z.string(),kind:z.enum(['organization_logo','organization_cover'])}).parse(upload.fields);
+    assertCsrf(request,form.csrf);
+    if(!upload.image)throw Object.assign(new Error('Choose an image to upload.'),{statusCode:400});
+    const image=await processOrganizationImage(upload.image,form.kind);
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`${request.params.id}:${form.kind}`]);
+      await client.query('UPDATE media_assets SET is_active=false WHERE organization_id=$1 AND kind=$2 AND is_active=true',[request.params.id,form.kind]);
+      const created=await client.query<{id:string}>(`INSERT INTO media_assets(organization_id,uploaded_by_user_id,kind,origin,storage_key,mime_type,byte_size,width_px,height_px,sha256)
+        VALUES($1,$2,$3,'uploaded',$4,$5,$6,$7,$8,$9) RETURNING id`,[request.params.id,user.id,form.kind,image.storageKey,image.mimeType,image.byteSize,image.widthPx,image.heightPx,image.sha256]);
+      await client.query(`INSERT INTO audit_events(actor_user_id,entity_type,entity_id,event_name,payload) VALUES($1,'media_asset',$2,'organization.media_uploaded',$3::jsonb)`,[user.id,created.rows[0].id,JSON.stringify({kind:form.kind,sha256:image.sha256})]);
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');await removeUncommittedImage(image);throw error;}finally{client.release();}
+    return reply.redirect(`/seller/organization/${request.params.id}#media`,303);
+  });
+
+  app.post<{ Params: { id: string; kind: string } }>('/seller/organization/:id/media/:kind/remove', async (request, reply) => {
+    const user=requireUser(request); const body=z.object({csrf:z.string()}).parse(request.body); assertCsrf(request,body.csrf); await requireOrganization(user,request.params.id);
+    const kind=z.enum(['organization_logo','organization_cover']).parse(request.params.kind);
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`${request.params.id}:${kind}`]);
+      const removed=await client.query<{id:string}>(`UPDATE media_assets SET is_active=false WHERE id=(SELECT id FROM media_assets WHERE organization_id=$1 AND kind=$2 AND is_active=true ORDER BY (origin='uploaded') DESC,id DESC LIMIT 1) RETURNING id`,[request.params.id,kind]);
+      if(!removed.rows[0])throw Object.assign(new Error('Active image not found.'),{statusCode:404});
+      await client.query(`INSERT INTO audit_events(actor_user_id,entity_type,entity_id,event_name,payload) VALUES($1,'media_asset',$2,'organization.media_removed',$3::jsonb)`,[user.id,removed.rows[0].id,JSON.stringify({kind})]);
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    return reply.redirect(`/seller/organization/${request.params.id}#media`,303);
   });
 
   app.post('/seller/product', async (request, reply) => {

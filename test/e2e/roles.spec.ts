@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto';
+import { unlink } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import pg from 'pg';
+import sharp from 'sharp';
 
 const acceptanceEnabled = process.env.PLAYWRIGHT_MUTATING_ACCEPTANCE === '1';
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4000';
 const expectedLaunchPhase = process.env.PLAYWRIGHT_EXPECT_LAUNCH_PHASE ?? 'discovery';
 const commerceAcceptance = expectedLaunchPhase === 'commerce';
+const mediaRoot = process.env.TEST_MEDIA_ROOT;
 const runId = randomUUID().replaceAll('-', '');
 const password = 'Acceptance-only-password-2026!';
 const passwordHash = '$2b$12$iQzAVZRdMnLVhv/exym3vu0xPp6FGBNW0yaP10TvjKgMx9ohZeFte';
@@ -67,6 +72,14 @@ test.describe('buyer, seller and administrator acceptance', () => {
     if (process.env.DATABASE_URL !== databaseUrl) {
       throw new Error('DATABASE_URL and TEST_DATABASE_URL must identify the same isolated database.');
     }
+    if (!mediaRoot || path.resolve(process.env.MEDIA_ROOT ?? '') !== path.resolve(mediaRoot)) {
+      throw new Error('MEDIA_ROOT and TEST_MEDIA_ROOT must identify the same isolated media directory.');
+    }
+    const resolvedMediaRoot = path.resolve(mediaRoot);
+    const temporaryRoot = `${path.resolve(os.tmpdir())}${path.sep}`;
+    if (!resolvedMediaRoot.toLowerCase().startsWith(temporaryRoot.toLowerCase())) {
+      throw new Error('The isolated media directory must be inside the system temporary directory.');
+    }
 
     database = new pg.Pool({ connectionString: databaseUrl, max: 2 });
     const client = await database.connect();
@@ -105,6 +118,9 @@ test.describe('buyer, seller and administrator acceptance', () => {
     await database.query(`DELETE FROM orders WHERE email=ANY($1::text[])`,[Object.values(emails)]);
     await database.query('DELETE FROM exchange_listings WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM organization_channels WHERE organization_id=$1', [organizationId]);
+    const media=await database.query<{storage_key:string}>('SELECT storage_key FROM media_assets WHERE organization_id=$1',[organizationId]);
+    await database.query('DELETE FROM media_assets WHERE organization_id=$1',[organizationId]);
+    for(const item of media.rows){if(/^[a-f0-9]{40}\.webp$/.test(item.storage_key))await unlink(path.join(path.resolve(mediaRoot!),item.storage_key)).catch(()=>undefined);}
     await database.query('DELETE FROM seller_shipping_zones WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM products WHERE organization_id=$1', [organizationId]);
     await database.query('DELETE FROM organizations WHERE id=$1', [organizationId]);
@@ -282,6 +298,15 @@ test.describe('buyer, seller and administrator acceptance', () => {
     await channels.getByLabel('Telegram').fill(`https://t.me/archive_${runId}`);
     await channels.getByRole('button', { name: 'Save contact channels' }).click();
 
+    const logoSource=await sharp({create:{width:1200,height:900,channels:3,background:'#315f45'}}).png().toBuffer();
+    const csrf=await page.locator('input[name="csrf"]').first().inputValue();
+    const mediaResponse=await page.context().request.post(`/seller/organization/${organizationId}/media`,{maxRedirects:0,multipart:{csrf,kind:'organization_logo',image:{name:'acceptance-logo.png',mimeType:'image/png',buffer:logoSource}}});
+    expect(mediaResponse.status()).toBe(303);
+    const storedMedia=await database.query<{storage_key:string;mime_type:string;width_px:number;height_px:number;sha256:string;is_active:boolean}>(`SELECT storage_key,mime_type,width_px,height_px,sha256,is_active FROM media_assets WHERE organization_id=$1 AND kind='organization_logo' ORDER BY id DESC LIMIT 1`,[organizationId]);
+    expect(storedMedia.rows[0]).toMatchObject({mime_type:'image/webp',width_px:800,height_px:600,is_active:true});
+    expect(storedMedia.rows[0].storage_key).toMatch(/^[a-f0-9]{40}\.webp$/);
+    expect(storedMedia.rows[0].sha256).toMatch(/^[a-f0-9]{64}$/);
+
     const exchangeTitle = `Discovery exchange ${runId}`;
     const exchange = page.locator('form[action="/seller/exchange"]');
     await exchange.getByLabel('Mode').selectOption('exchange');
@@ -306,11 +331,19 @@ test.describe('buyer, seller and administrator acceptance', () => {
     await expect(page.locator('main')).toContainText(exchangeTitle);
     await expect(page.locator('main')).toContainText('Cold-hardy legumes and northern landraces');
     await expect(page.locator(`a[href="mailto:archive-${runId}@example.test"]`)).toBeVisible();
+    const logo=page.locator(`img[src="/media/${storedMedia.rows[0].storage_key}"]`);
+    await expect(logo).toBeVisible();
+    const mediaFile=await page.context().request.get(`/media/${storedMedia.rows[0].storage_key}`);
+    expect(mediaFile.status()).toBe(200);
+    expect(mediaFile.headers()['content-type']).toContain('image/webp');
 
     await page.goto(`/seller/organization/${organizationId}`);
     const article = page.locator('article').filter({ hasText: exchangeTitle });
     await article.getByRole('button', { name: 'Withdraw' }).click();
+    await page.goto(`/seller/organization/${organizationId}`);
+    await page.getByRole('button',{name:'Remove current logo'}).click();
+    expect((await database.query<{is_active:boolean}>('SELECT is_active FROM media_assets WHERE storage_key=$1',[storedMedia.rows[0].storage_key])).rows[0].is_active).toBe(false);
     expect((await database.query<{status:string}>('SELECT status FROM exchange_listings WHERE id=$1', [listing.rows[0].id])).rows[0].status).toBe('withdrawn');
-    expect((await database.query(`SELECT 1 FROM audit_events WHERE actor_user_id=$1 AND event_name=ANY($2::text[])`, [sellerUserId, ['organization.profile_updated','organization.channels_updated','exchange.published','exchange.withdrawn']])).rowCount).toBe(4);
+    expect((await database.query(`SELECT 1 FROM audit_events WHERE actor_user_id=$1 AND event_name=ANY($2::text[])`, [sellerUserId, ['organization.profile_updated','organization.channels_updated','organization.media_uploaded','organization.media_removed','exchange.published','exchange.withdrawn']])).rowCount).toBe(6);
   });
 });
