@@ -10,10 +10,10 @@ The product is positioned as a living seed archive rather than a generic shop. A
 
 ## Audiences and core paths
 
-- Buyers find seeds with a clear source and seller-specific shipping.
-- Organizations publish durable public profiles and reviewed catalog records.
+- Visitors find seeds with a clear source and follow approved external seller links during phase 1.
+- Organizations publish durable public profiles, official contact channels, reviewed catalog records and profile media.
 - Collectors arrange non-commercial exchanges or donations directly.
-- Sellers submit products and fulfil orders through protected workflows.
+- Sellers submit internal marketplace products and fulfil orders through protected workflows only in phase 2.
 - Platform administrators approve organizations and products, review reports and handle delivery cases.
 
 ## Current commercial model
@@ -47,7 +47,7 @@ The proposed 10% rate is below the cited eBay and Amazon base rates and above Et
 
 ## Current stage
 
-The Fastify, EJS, TypeScript and PostgreSQL application is a closed staging migration target. Production remains on the legacy PHP/MySQL application. The new application includes identity and RBAC, public discovery, seller and moderation writes, cart and order foundations, messages, workers, tracked fulfilment and delivery cases. Marketplace payments remain disabled by default.
+The Fastify, EJS, TypeScript and PostgreSQL application is a migration target. Production remains on the legacy PHP/MySQL application, and the existing closed staging release is older than the current local discovery branch. The local application includes identity and RBAC, public discovery, organization profiles and official channels, exchange/donation management, guarded Oreshka external offers, secure profile media, messages, and commerce foundations kept behind the second-phase boundary. Marketplace payments remain disabled by default.
 
 The release contract has two explicit phases:
 
@@ -70,11 +70,11 @@ These are owner and legal decisions. Code must implement the approved policy rat
 
 ## Recommended work order
 
-1. Finish and review the local homepage change, reconcile status documentation and keep the release local.
-2. Complete image upload, resize, storage and source-provenance handling.
-3. Finish reviews, reports, collections/journal and notification interaction screens.
-4. Run seeded buyer, seller and administrator acceptance on closed staging, including SMTP, monitoring, load and backup/restore evidence.
-5. Take a fresh read-only legacy inventory and approve a field-by-field import contract.
-6. Run two complete production-snapshot migration rehearsals and verify media hashes.
-7. Accept Stripe Connect, refunds, disputes, reversals and payout behavior in test mode.
-8. Prepare an explicit cutover and rollback decision. Do not change production traffic without owner approval.
+1. Review and explicitly approve export of the local discovery commits to GitHub; no push has been performed for this branch.
+2. Deploy the reviewed discovery release to the closed staging endpoint, configure persistent media storage and repeat the public, RBAC, organization, exchange and upload acceptance checks.
+3. Take a fresh read-only legacy production inventory and approve the field-by-field discovery import contract.
+4. Run two complete production-snapshot discovery migration rehearsals, including database parity, media manifests/SHA-256, sitemap output and restore evidence.
+5. Complete phase-1 staging operational acceptance: administrator moderation, SMTP where required, monitoring, performance, backup/restore and rollback drill.
+6. Make a separate owner decision on production Caddy/DNS cutover, followed by live verification and the observation window.
+7. Only after phase 1 is accepted, finish the deferred community screens and approve the legal/payment policy for phase 2.
+8. Accept Stripe Connect, checkout, refunds, disputes, reversals and payout behavior in test mode before any commerce activation request.
