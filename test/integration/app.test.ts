@@ -120,6 +120,11 @@ describe('public application', () => {
       expect(legacy.statusCode).toBe(301);
       expect(legacy.headers.location).toBe(`${path}?source=legacy`);
     }
+    for (const path of ['/search', '/register', '/login', '/forgot-password', '/reset-password', '/account', '/messages', '/admin']) {
+      const legacy = await app.inject({ method: 'GET', url: `${path}/?token=preserved` });
+      expect(legacy.statusCode).toBe(301);
+      expect(legacy.headers.location).toBe(`${path}?token=preserved`);
+    }
     expect((await app.inject({ method: 'GET', url: '/product/?slug=../../cart' })).statusCode).toBe(404);
   });
 });

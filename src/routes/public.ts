@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { content } from '../content/en.js';
 import { pool } from '../db/pool.js';
 import { pageModel } from '../lib/view.js';
-import { LEGACY_PUBLIC_STATIC_REDIRECTS, legacyStaticRedirectTarget } from '../domain/legacy-public-routes.js';
+import { LEGACY_DISCOVERY_STATIC_REDIRECTS, legacyStaticRedirectTarget } from '../domain/legacy-public-routes.js';
 import { getOrganization, getProduct, homeModel, listExchanges, listOrganizations, listProducts } from '../services/catalog.js';
 
 const slugSchema = z.string().regex(/^[a-z0-9-]{1,190}$/);
@@ -71,7 +71,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
     return reply.view('pages/catalog/organization.ejs', pageModel(request, { title: organization.name, description: organization.description, canonical: `/directory/${organization.slug}`, organization }));
   });
 
-  for (const [legacyPath] of LEGACY_PUBLIC_STATIC_REDIRECTS) {
+  for (const [legacyPath] of LEGACY_DISCOVERY_STATIC_REDIRECTS) {
     if (legacyPath === '/directory/') continue;
     app.get(legacyPath, async (request, reply) => {
       const url = new URL(request.url, 'http://localhost');
