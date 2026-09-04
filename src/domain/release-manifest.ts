@@ -45,7 +45,14 @@ function parseManifest(input: unknown): DiscoveryReleaseManifest {
 
 export const discoveryReleaseManifestSchema = { parse: parseManifest } as const;
 
-const allowedExactFiles = new Set(['.nvmrc', 'package.json', 'package-lock.json']);
+const allowedExactFiles = new Set([
+  '.nvmrc',
+  'package.json',
+  'package-lock.json',
+  'ops/caddy/activate-production-caddy.sh',
+  'ops/caddy/rollback-production-caddy.sh',
+  'ops/caddy/seedexchange-production.caddy',
+]);
 const allowedPrefixes = ['dist/', 'ops/systemd/production/', 'public/', 'src/templates/'];
 const requiredFiles = [
   '.nvmrc',
@@ -58,6 +65,9 @@ const requiredFiles = [
   'dist/scripts/verify-release-manifest.js',
   'dist/scripts/verify-ready.js',
   'dist/scripts/verify-discovery-runtime.js',
+  'ops/caddy/activate-production-caddy.sh',
+  'ops/caddy/rollback-production-caddy.sh',
+  'ops/caddy/seedexchange-production.caddy',
   'ops/systemd/production/seedexchange-production.service',
   'ops/systemd/production/seedexchange-production-outbox.service',
   'ops/systemd/production/seedexchange-production-outbox.timer',
@@ -76,7 +86,7 @@ function isAllowedReleaseFile(relative: string): boolean {
 }
 
 function isAllowedReleaseDirectory(relative: string): boolean {
-  return ['dist', 'ops', 'ops/systemd', 'ops/systemd/production', 'public', 'src', 'src/templates'].includes(relative)
+  return ['dist', 'ops', 'ops/caddy', 'ops/systemd', 'ops/systemd/production', 'public', 'src', 'src/templates'].includes(relative)
     || relative.startsWith('dist/')
     || relative.startsWith('ops/systemd/production/')
     || relative.startsWith('public/')

@@ -54,6 +54,7 @@ npm run manifest:media -- --root=<restored-legacy-uploads> --output=<secure-mani
 - `src/templates/` and `public/assets/`: EJS pages and shared design system.
 - `test/`: unit, integration and browser checks.
 - `ops/`: systemd, Caddy, staging deployment and separately approval-gated production discovery preparation/activation.
+- `ops/caddy/`: release-manifested production fragment plus separate approval-gated activation and rollback scripts; neither script changes DNS.
 - `ops/systemd/production/`: release-manifested phase-1 units for web, outbox and sitemap only; no marketplace worker.
 - `ops/PRODUCTION_DISCOVERY_RUNBOOK.md`: approval-gated phase-1 production cutover and rollback procedure.
 - `MIGRATION.md`: verified evidence, gaps and acceptance gates.

@@ -22,6 +22,9 @@ async function createReleaseRoot(): Promise<string> {
     'dist/scripts/verify-release-manifest.js': 'export {};',
     'dist/scripts/verify-ready.js': 'export {};',
     'dist/scripts/verify-discovery-runtime.js': 'export {};',
+    'ops/caddy/activate-production-caddy.sh': '#!/usr/bin/env bash',
+    'ops/caddy/rollback-production-caddy.sh': '#!/usr/bin/env bash',
+    'ops/caddy/seedexchange-production.caddy': 'seedexchange.online {}',
     'ops/systemd/production/seedexchange-production.service': '[Service]',
     'ops/systemd/production/seedexchange-production-outbox.service': '[Service]',
     'ops/systemd/production/seedexchange-production-outbox.timer': '[Timer]',
@@ -67,6 +70,9 @@ describe('production discovery release manifest', () => {
       await writeFile(path.join(root, '.env'), 'SECRET=value');
       await expect(createDiscoveryReleaseManifest(root, commit, tree)).rejects.toThrow('Release contains a file outside the allowlist: .env.');
       await rm(path.join(root, '.env'));
+      await writeFile(path.join(root, 'ops/caddy/unreviewed.txt'), 'unexpected');
+      await expect(createDiscoveryReleaseManifest(root, commit, tree)).rejects.toThrow('Release contains a file outside the allowlist: ops/caddy/unreviewed.txt.');
+      await rm(path.join(root, 'ops/caddy/unreviewed.txt'));
       await writeFile(path.join(root, '.nvmrc'), '22\n');
       await expect(createDiscoveryReleaseManifest(root, commit, tree)).rejects.toThrow('Release must target Node 24.');
       await writeFile(path.join(root, '.nvmrc'), '24\n');

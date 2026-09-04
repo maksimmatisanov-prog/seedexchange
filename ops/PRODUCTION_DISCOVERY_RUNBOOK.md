@@ -114,11 +114,23 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 
 ## 6. Cutover and rollback
 
-1. Obtain separate explicit approval for Caddy and DNS changes.
-2. Install the reviewed production Caddy block, validate and reload Caddy. Change root and `www` DNS to the VPS only after loopback acceptance passes.
-3. Verify authoritative DNS, TLS, canonical URLs, live pages, external links, sitemap, logs and the discovery capability report from at least two external resolvers.
-4. If a blocking fault appears, restore the recorded Hostinger DNS values and keep the PHP release/database/uploads unchanged. Do not attempt a partial data rollback.
-5. Repeat the sanitized observation immediately after public cutover, periodically during the window and at or after 24 hours. Use a new output path for each run and record the emitted report SHA-256 with the operator log:
+1. Obtain separate explicit approvals for Caddy and DNS changes. The current VPS Caddyfile imports `/etc/caddy/sites-enabled/*.caddy`; do not edit the shared Caddyfile or the independent staging fragment.
+2. After Caddy approval, install only the release-manifested production fragment. The script re-verifies the active release, Node readiness, operational observation, standalone fragment and complete Caddy configuration before reload. It restores a newly installed fragment if validation, reload or the local HTTP-to-HTTPS check fails, and it does not change DNS:
+
+   ```bash
+   SEEDX_PRODUCTION_CADDY_APPROVED=YES bash /srv/seedexchange-production/current/ops/caddy/activate-production-caddy.sh <40-char-commit> 003_discovery_migration_scope.sql /directory/<slug> /product/<slug>
+   ```
+
+3. After separate DNS approval, change root and `www` DNS to the recorded VPS address. Hostinger and hPanel operations are Chrome-only. Do not remove or modify the legacy PHP release, MySQL database or uploads.
+4. Verify authoritative DNS, TLS, the `www` redirect, canonical URLs, live pages, external links, sitemap, logs and the discovery capability report from at least two external resolvers.
+5. If a blocking fault appears, restore the recorded Hostinger DNS values first and wait until the selected authoritative/external resolvers return the legacy values. After separate Caddy-rollback approval, remove only the exact release-matched production fragment; the rollback script restores it if the remaining shared Caddy configuration cannot validate or reload:
+
+   ```bash
+   SEEDX_PRODUCTION_CADDY_ROLLBACK_APPROVED=YES bash /srv/seedexchange-production/releases/<40-char-commit>/ops/caddy/rollback-production-caddy.sh <40-char-commit>
+   ```
+
+   Do not attempt a partial data rollback.
+6. Repeat the sanitized observation immediately after public cutover, periodically during the window and at or after 24 hours. Use a new output path for each run and record the emitted report SHA-256 with the operator log:
 
    ```bash
    npm run verify:production-observation -- --migration=003_discovery_migration_scope.sql --organization=/directory/<slug> --product=/product/<slug> --output=/secure/observation-<timestamp>.json
