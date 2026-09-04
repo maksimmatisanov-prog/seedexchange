@@ -3,11 +3,19 @@ import { config } from '../src/config.js';
 import { validateDiscoveryDataReadiness, type DiscoveryDataReadiness } from '../src/domain/discovery-readiness.js';
 import { verifyMediaInventory, type MediaAssetRecord } from '../src/domain/media-verification.js';
 import { isExternalHttpsUrl } from '../src/domain/public-url.js';
+import {
+  DISCOVERY_ALLOWED_TARGET_TABLES,
+  DISCOVERY_FORBIDDEN_TARGET_TABLES,
+  quotePostgresIdentifier,
+} from '../src/domain/legacy-migration.js';
 
 const expectedMigration = process.argv[2] || '003_discovery_migration_scope.sql';
+const forbiddenCommerceExpression = DISCOVERY_FORBIDDEN_TARGET_TABLES
+  .map((table) => `(SELECT count(*) FROM ${quotePostgresIdentifier(table)})`)
+  .join('+');
 
 try {
-  const [migration, run, counts, mediaRows, productUrls] = await Promise.all([
+  const [migration, run, counts, mediaRows, productUrls, schemaTables] = await Promise.all([
     pool.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1'),
     pool.query<{ status: string; scope: string; source_fingerprint: string }>(`SELECT status,scope,source_fingerprint
       FROM legacy_migration_runs WHERE mode='import' ORDER BY completed_at DESC NULLS LAST,started_at DESC LIMIT 1`),
@@ -16,10 +24,7 @@ try {
       (SELECT count(*) FROM users WHERE role='platform_admin' AND email_verified_at IS NOT NULL)::text verified_platform_admins,
       (SELECT count(*) FROM products WHERE status='active' AND purchase_mode='external')::text active_external_products,
       (SELECT count(*) FROM exchange_listings WHERE status='active')::text active_exchanges,
-      ((SELECT count(*) FROM shipping_zones)+(SELECT count(*) FROM seller_shipping_zones)+(SELECT count(*) FROM orders)+
-       (SELECT count(*) FROM seller_orders)+(SELECT count(*) FROM order_items)+(SELECT count(*) FROM inventory_reservations)+
-       (SELECT count(*) FROM stripe_events)+(SELECT count(*) FROM seller_transfers)+(SELECT count(*) FROM delivery_cases)+
-       (SELECT count(*) FROM reviews)+(SELECT count(*) FROM review_responses))::text forbidden_commerce_rows,
+      (${forbiddenCommerceExpression})::text forbidden_commerce_rows,
       (SELECT count(*) FROM organizations WHERE marketplace_enabled OR stripe_account_id IS NOT NULL OR stripe_charges_enabled OR stripe_payouts_enabled)::text payment_capability_organizations,
       (SELECT count(*) FROM supplier_publication_batches WHERE status='pending_review')::text open_supplier_batches,
       (SELECT count(*) FROM supplier_publication_batches WHERE status='approved' AND sitemap_status='failed')::text failed_sitemap_batches,
@@ -28,10 +33,13 @@ try {
     pool.query<{ purchase_mode: string; external_purchase_url: string | null; image_url: string | null }>(
       'SELECT purchase_mode,external_purchase_url,image_url FROM products',
     ),
+    pool.query<{ table_name: string }>(`SELECT table_name FROM information_schema.tables
+      WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name`),
   ]);
   const media = await verifyMediaInventory(mediaRows.rows, config.MEDIA_ROOT);
   const row = counts.rows[0];
   const migrationRun = run.rows[0];
+  const classifiedTables = new Set<string>([...DISCOVERY_ALLOWED_TARGET_TABLES, ...DISCOVERY_FORBIDDEN_TARGET_TABLES]);
   const state: DiscoveryDataReadiness = {
     currentMigration: migration.rows[0]?.version ?? null,
     expectedMigration,
@@ -43,6 +51,7 @@ try {
     activeExternalProducts: Number(row.active_external_products),
     activeExchanges: Number(row.active_exchanges),
     forbiddenCommerceRows: Number(row.forbidden_commerce_rows),
+    unclassifiedTables: schemaTables.rows.map(({ table_name }) => table_name).filter((table) => !classifiedTables.has(table)),
     paymentCapabilityOrganizations: Number(row.payment_capability_organizations),
     invalidDiscoveryProducts: productUrls.rows.filter((product) =>
       product.purchase_mode !== 'external'

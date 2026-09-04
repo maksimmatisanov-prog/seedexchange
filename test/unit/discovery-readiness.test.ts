@@ -12,6 +12,7 @@ const ready: DiscoveryDataReadiness = {
   activeExternalProducts: 10,
   activeExchanges: 0,
   forbiddenCommerceRows: 0,
+  unclassifiedTables: [],
   paymentCapabilityOrganizations: 0,
   invalidDiscoveryProducts: 0,
   openSupplierBatches: 0,
@@ -29,12 +30,14 @@ describe('discovery production data readiness', () => {
     const errors = validateDiscoveryDataReadiness({
       ...ready,
       forbiddenCommerceRows: 1,
+      unclassifiedTables: ['payment_attempts'],
       paymentCapabilityOrganizations: 1,
       invalidDiscoveryProducts: 1,
       openSupplierBatches: 1,
       pendingProductReviews: 1,
     });
     expect(errors).toContain('Commerce tables contain rows during discovery launch.');
+    expect(errors).toContain('The public schema contains tables without a discovery safety classification.');
     expect(errors).toContain('An organization retains marketplace or Stripe capabilities.');
     expect(errors).toContain('Products outside the HTTPS external-offer contract exist.');
     expect(errors).toContain('Supplier batches are still awaiting review.');

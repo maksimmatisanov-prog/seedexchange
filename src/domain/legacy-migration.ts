@@ -85,6 +85,22 @@ export const DISCOVERY_FORBIDDEN_TARGET_TABLES = [
   'stripe_events', 'seller_transfers', 'delivery_cases', 'reviews', 'review_responses',
 ] as const;
 
+// Every public base table must be classified here or in the forbidden list.
+// The production readiness gate rejects an unclassified table so a future
+// commerce migration cannot silently bypass the discovery launch boundary.
+export const DISCOVERY_ALLOWED_TARGET_TABLES = [
+  'schema_migrations', 'legacy_migration_runs',
+  'users', 'sessions', 'auth_tokens', 'auth_rate_limits',
+  'organizations', 'organization_members', 'founder_program_state', 'founder_program_members',
+  'media_assets', 'products', 'exchange_listings',
+  'favorites', 'collection_items', 'growth_journal_entries',
+  'conversations', 'conversation_messages', 'reports', 'notifications',
+  'point_ledger', 'achievement_unlocks', 'organization_channels',
+  'supplier_catalog_imports', 'supplier_catalog_items',
+  'supplier_publication_batches', 'supplier_publication_batch_items',
+  'outbox_messages', 'audit_events',
+] as const;
+
 export function legacyPlansForScope(scope: LegacyMigrationScope): LegacyTablePlan[] {
   return (scope === 'discovery' ? sharedDiscoveryPlans : fullPlans).map((plan) => ({
     ...plan,

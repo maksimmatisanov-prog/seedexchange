@@ -9,6 +9,7 @@ export type DiscoveryDataReadiness = {
   activeExternalProducts: number;
   activeExchanges: number;
   forbiddenCommerceRows: number;
+  unclassifiedTables: string[];
   paymentCapabilityOrganizations: number;
   invalidDiscoveryProducts: number;
   openSupplierBatches: number;
@@ -27,6 +28,7 @@ export function validateDiscoveryDataReadiness(state: DiscoveryDataReadiness): s
   if (state.verifiedPlatformAdmins < 1) errors.push('No verified platform administrator is available.');
   if (state.activeExternalProducts < 1) errors.push('No active external product is available.');
   if (state.forbiddenCommerceRows !== 0) errors.push('Commerce tables contain rows during discovery launch.');
+  if (state.unclassifiedTables.length !== 0) errors.push('The public schema contains tables without a discovery safety classification.');
   if (state.paymentCapabilityOrganizations !== 0) errors.push('An organization retains marketplace or Stripe capabilities.');
   if (state.invalidDiscoveryProducts !== 0) errors.push('Products outside the HTTPS external-offer contract exist.');
   if (state.openSupplierBatches !== 0) errors.push('Supplier batches are still awaiting review.');
