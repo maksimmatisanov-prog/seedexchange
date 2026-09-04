@@ -1,10 +1,12 @@
 import { pool } from '../src/db/pool.js';
+import { config } from '../src/config.js';
 import { validateDiscoveryDataReadiness, type DiscoveryDataReadiness } from '../src/domain/discovery-readiness.js';
+import { verifyMediaInventory, type MediaAssetRecord } from '../src/domain/media-verification.js';
 
 const expectedMigration = process.argv[2] || '003_discovery_migration_scope.sql';
 
 try {
-  const [migration, run, counts] = await Promise.all([
+  const [migration, run, counts, mediaRows] = await Promise.all([
     pool.query<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1'),
     pool.query<{ status: string; scope: string; source_fingerprint: string }>(`SELECT status,scope,source_fingerprint
       FROM legacy_migration_runs WHERE mode='import' ORDER BY completed_at DESC NULLS LAST,started_at DESC LIMIT 1`),
@@ -22,7 +24,9 @@ try {
       (SELECT count(*) FROM supplier_publication_batches WHERE status='pending_review')::text open_supplier_batches,
       (SELECT count(*) FROM supplier_publication_batches WHERE status='approved' AND sitemap_status='failed')::text failed_sitemap_batches,
       (SELECT count(*) FROM products WHERE status='pending_review')::text pending_product_reviews`),
+    pool.query<MediaAssetRecord>('SELECT storage_key,mime_type,byte_size,width_px,height_px,sha256,is_active FROM media_assets ORDER BY storage_key'),
   ]);
+  const media = await verifyMediaInventory(mediaRows.rows, config.MEDIA_ROOT);
   const row = counts.rows[0];
   const migrationRun = run.rows[0];
   const state: DiscoveryDataReadiness = {
@@ -41,9 +45,10 @@ try {
     openSupplierBatches: Number(row.open_supplier_batches),
     failedSitemapBatches: Number(row.failed_sitemap_batches),
     pendingProductReviews: Number(row.pending_product_reviews),
+    mediaReady: media.ready,
   };
   const errors = validateDiscoveryDataReadiness(state);
-  console.log(JSON.stringify({ ready: errors.length === 0, ...state, errors }, null, 2));
+  console.log(JSON.stringify({ ready: errors.length === 0, ...state, media: { databaseRows: media.databaseRows, files: media.files, errors: media.errors }, errors }, null, 2));
   if (errors.length) process.exitCode = 1;
 } finally {
   await pool.end();

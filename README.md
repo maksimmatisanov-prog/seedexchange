@@ -28,6 +28,7 @@ npm run migrate-legacy -- --inventory --scope=discovery
 npm run migrate-legacy -- --dry-run --scope=discovery
 npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
 npm run prepare:supplier-batch -- --limit=200
+npm run verify:media
 ```
 
 `migrate-legacy` defaults to the discovery scope. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. The full scope contains commerce history and must not be used for the discovery launch.

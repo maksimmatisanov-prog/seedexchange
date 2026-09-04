@@ -37,7 +37,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 2. Create `shared/production.env` privately with `HOST=127.0.0.1`, `PORT=4200`, `APP_URL=https://seedexchange.online`, `MEDIA_ROOT=/srv/seedexchange-production/shared/storage/media` and all discovery flags disabled. Create that media directory for the `seedexchange` service account with no public write access.
 3. Extract the exact reviewed GitHub/CI artifact into an immutable release, verify its SHA-256, run `npm ci`, `npm run check`, `npm test`, `npm run build` and `npm prune --omit=dev`.
 4. Apply the ordered PostgreSQL migrations. `/ready` must report the latest migration bundled in the artifact.
-5. Copy required first-party media into `shared/storage` and verify the complete file manifest by path, size and SHA-256. External Oreshka images remain HTTPS URLs and are not copied.
+5. Copy required first-party media into `shared/storage/media` and verify the complete file manifest by path, size and SHA-256. External Oreshka images remain HTTPS URLs and are not copied.
 
 ## 4. Rehearse and import discovery data
 
@@ -53,10 +53,11 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    ```bash
    npm run migrate-legacy -- --import --scope=discovery
    npm run generate-sitemap
+   npm run verify:media
    npm run verify:discovery-data -- 003_discovery_migration_scope.sql
    ```
 
-4. The verifier must report `ready: true`. Any commerce row, payment capability, non-HTTPS product, pending moderation, failed sitemap state, missing administrator or schema mismatch blocks activation.
+4. Both verifiers must report `ready: true`. Any media path/hash/metadata mismatch or orphan file, commerce row, payment capability, non-HTTPS product, pending moderation, failed sitemap state, missing administrator or schema mismatch blocks activation.
 
 ## 5. Private runtime acceptance
 

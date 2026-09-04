@@ -14,6 +14,7 @@ export type DiscoveryDataReadiness = {
   openSupplierBatches: number;
   failedSitemapBatches: number;
   pendingProductReviews: number;
+  mediaReady: boolean;
 };
 
 export function validateDiscoveryDataReadiness(state: DiscoveryDataReadiness): string[] {
@@ -31,5 +32,6 @@ export function validateDiscoveryDataReadiness(state: DiscoveryDataReadiness): s
   if (state.openSupplierBatches !== 0) errors.push('Supplier batches are still awaiting review.');
   if (state.failedSitemapBatches !== 0) errors.push('An approved supplier batch has a failed sitemap state.');
   if (state.pendingProductReviews !== 0) errors.push('Products are still awaiting moderation.');
+  if (!state.mediaReady) errors.push('The first-party media inventory is incomplete or does not match PostgreSQL.');
   return errors;
 }

@@ -1,9 +1,11 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import { processOrganizationImage, removeUncommittedImage } from '../../src/services/media.js';
+import { verifyMediaInventory } from '../../src/domain/media-verification.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -33,5 +35,42 @@ describe('organization media processing', () => {
     const tiny = await sharp({ create: { width: 16, height: 16, channels: 4, background: '#ffffff' } }).png().toBuffer();
     await expect(processOrganizationImage(tiny, 'organization_logo', root)).rejects.toMatchObject({ statusCode: 400 });
     await expect(processOrganizationImage(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>'), 'organization_cover', root)).rejects.toMatchObject({ statusCode: 400 });
+  });
+});
+
+describe('media inventory verification', () => {
+  it('matches database metadata and SHA-256 to an exact filesystem manifest', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'seedexchange-media-'));
+    temporaryDirectories.push(root);
+    const key = `${'a'.repeat(40)}.webp`;
+    const data = await sharp({ create: { width: 320, height: 240, channels: 3, background: '#315f45' } }).webp().toBuffer();
+    await writeFile(path.join(root, key), data);
+    const report = await verifyMediaInventory([{
+      storage_key: key, mime_type: 'image/webp', byte_size: data.length, width_px: 320, height_px: 240,
+      sha256: createHash('sha256').update(data).digest('hex'), is_active: true,
+    }], root);
+    expect(report).toMatchObject({ ready: true, databaseRows: 1, files: 1, errors: [] });
+    expect(report.manifest[0]).toMatchObject({ storageKey: key, widthPx: 320, heightPx: 240, active: true });
+  });
+
+  it('fails closed for missing hashes, metadata drift and orphan files', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'seedexchange-media-'));
+    temporaryDirectories.push(root);
+    const key = `${'b'.repeat(40)}.webp`;
+    const orphan = `${'c'.repeat(40)}.webp`;
+    const data = await sharp({ create: { width: 160, height: 120, channels: 3, background: '#b88a42' } }).webp().toBuffer();
+    await writeFile(path.join(root, key), data);
+    await writeFile(path.join(root, orphan), data);
+    const report = await verifyMediaInventory([{
+      storage_key: key, mime_type: 'image/webp', byte_size: data.length + 1, width_px: 161, height_px: 120,
+      sha256: null, is_active: false,
+    }], root);
+    expect(report.ready).toBe(false);
+    expect(report.errors).toEqual(expect.arrayContaining([
+      `Media file has no database row: ${orphan}.`,
+      `Media byte size mismatch: ${key}.`,
+      `Media dimensions mismatch: ${key}.`,
+      `Media database SHA-256 is missing or invalid: ${key}.`,
+    ]));
   });
 });

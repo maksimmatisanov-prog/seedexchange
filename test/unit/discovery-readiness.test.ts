@@ -17,6 +17,7 @@ const ready: DiscoveryDataReadiness = {
   openSupplierBatches: 0,
   failedSitemapBatches: 0,
   pendingProductReviews: 0,
+  mediaReady: true,
 };
 
 describe('discovery production data readiness', () => {
@@ -44,5 +45,10 @@ describe('discovery production data readiness', () => {
     const errors = validateDiscoveryDataReadiness({ ...ready, currentMigration: '002_legacy_compatibility.sql', migrationRunScope: 'full' });
     expect(errors).toContain('Expected migration 003_discovery_migration_scope.sql, received 002_legacy_compatibility.sql.');
     expect(errors).toContain('No successful fingerprinted discovery import was found.');
+  });
+
+  it('requires the first-party media manifest to match PostgreSQL', () => {
+    expect(validateDiscoveryDataReadiness({ ...ready, mediaReady: false }))
+      .toContain('The first-party media inventory is incomplete or does not match PostgreSQL.');
   });
 });

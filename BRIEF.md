@@ -47,7 +47,7 @@ The proposed 10% rate is below the cited eBay and Amazon base rates and above Et
 
 ## Current stage
 
-The Fastify, EJS, TypeScript and PostgreSQL application is a migration target. Production remains on the legacy PHP/MySQL application, and the existing closed staging release is older than the current local discovery branch. The local application includes identity and RBAC, public discovery, organization profiles and official channels, exchange/donation management, guarded Oreshka external offers, secure profile media, messages, and commerce foundations kept behind the second-phase boundary. Marketplace payments remain disabled by default.
+The Fastify, EJS, TypeScript and PostgreSQL application is a migration target. Production remains on the legacy PHP/MySQL application, and the existing closed staging release is older than the current local discovery branch. The local application includes identity and RBAC, public discovery, organization profiles and official channels, exchange/donation management, guarded Oreshka external offers, secure profile media, messages, and commerce foundations kept behind the second-phase boundary. Marketplace payments remain disabled by default. Production readiness now also fails closed when first-party media files, PostgreSQL metadata and SHA-256 do not reconcile.
 
 The release contract has two explicit phases:
 
