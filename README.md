@@ -27,6 +27,7 @@ Discovery-phase data operations are dry-run first:
 npm run migrate-legacy -- --inventory --scope=discovery
 npm run migrate-legacy -- --dry-run --scope=discovery
 npm run verify:discovery-rehearsal -- --inventory=<inventory-1.json> --inventory=<inventory-2.json> --dry-run=<dry-run-1.json> --dry-run=<dry-run-2.json>
+npm run verify:production-env -- --file=<private-production.env>
 npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
 npm run prepare:supplier-batch -- --limit=200
 npm run verify:discovery-data

@@ -74,7 +74,7 @@ These are owner and legal decisions. Code must implement the approved policy rat
 2. Deploy the reviewed discovery release to the closed staging endpoint, configure persistent media storage and repeat the public, RBAC, organization, exchange and upload acceptance checks.
 3. Take a fresh read-only legacy production inventory and approve the field-by-field discovery import contract.
 4. Run two complete production-snapshot discovery migration rehearsals, save two inventory and two dry-run reports with distinct run IDs, pass the offline rehearsal verifier, and include database parity, media manifests/SHA-256, sitemap output and restore evidence.
-5. Complete phase-1 staging operational acceptance: administrator moderation, SMTP where required, monitoring, performance, backup/restore and rollback drill.
+5. Complete phase-1 staging operational acceptance: validated isolated production environment, administrator moderation, SMTP, monitoring, performance, backup/restore and rollback drill.
 6. Make a separate owner decision on production Caddy/DNS cutover, followed by live verification and the observation window.
 7. Only after phase 1 is accepted, finish the deferred community screens and approve the legal/payment policy for phase 2.
 8. Accept Stripe Connect, checkout, refunds, disputes, reversals and payout behavior in test mode before any commerce activation request.

@@ -35,7 +35,13 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 ## 3. Prepare the isolated Node production target
 
 1. Create `/srv/seedexchange-production/{releases,shared/storage}` and a dedicated PostgreSQL database/role. Do not reuse `/srv/seedexchange` staging.
-2. Create `shared/production.env` privately with `HOST=127.0.0.1`, `PORT=4200`, `APP_URL=https://seedexchange.online`, `MEDIA_ROOT=/srv/seedexchange-production/shared/storage/media` and all discovery flags disabled. Create that media directory for the `seedexchange` service account with no public write access.
+2. Copy `ops/production.env.example` to `shared/production.env`, replace every placeholder privately and restrict it to the service account. Use the dedicated `seedexchange_production` PostgreSQL database and a non-superuser local role; never retain `LEGACY_MYSQL_URL` or Stripe secrets in the runtime file. Validate it before service installation:
+
+   ```bash
+   npm run verify:production-env -- --file=/srv/seedexchange-production/shared/production.env
+   ```
+
+   It must report `ready: true`. Create the configured media directory for the `seedexchange` service account with no public write access.
 3. Extract the exact reviewed GitHub/CI artifact into an immutable release, verify its SHA-256, run `npm ci`, `npm run check`, `npm test`, `npm run build` and `npm prune --omit=dev`.
 4. Apply the ordered PostgreSQL migrations. `/ready` must report the latest migration bundled in the artifact.
 5. From the restored legacy uploads, generate a source manifest with `npm run manifest:media -- --root=/absolute/restored/uploads --output=/secure/source-media-manifest.json`; record the manifest file's own SHA-256 with the backup evidence. Then copy required first-party media into `shared/storage/media`. External Oreshka images remain HTTPS URLs and are not copied.
