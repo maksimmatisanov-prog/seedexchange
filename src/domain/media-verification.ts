@@ -3,6 +3,7 @@ import type { Dirent } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
+import { z } from 'zod';
 
 export type MediaAssetRecord = {
   storage_key: string;
@@ -23,6 +24,21 @@ export type VerifiedMediaEntry = {
   active: boolean;
 };
 
+export type MediaFileFingerprint = Omit<VerifiedMediaEntry, 'active'>;
+
+export const mediaManifestSchema = z.object({
+  ready: z.literal(true),
+  version: z.literal(1),
+  entries: z.array(z.object({
+    storageKey: z.string().regex(/^[a-f0-9]{40}\.webp$/),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    byteSize: z.number().int().positive(),
+    widthPx: z.number().int().positive(),
+    heightPx: z.number().int().positive(),
+  })),
+  errors: z.array(z.string()).length(0),
+});
+
 export type MediaVerificationIssue = {
   code: 'root_unavailable' | 'unexpected_entry' | 'orphan_file' | 'invalid_key' | 'missing_file' | 'decode_failed' | 'format_mismatch' | 'byte_size_mismatch' | 'dimensions_mismatch' | 'database_sha_missing' | 'database_sha_invalid' | 'sha_mismatch';
   storageKey: string | null;
@@ -30,6 +46,47 @@ export type MediaVerificationIssue = {
 };
 
 const keyPattern = /^[a-f0-9]{40}\.webp$/;
+
+export async function inventoryMediaDirectory(mediaRoot: string) {
+  const root = path.resolve(mediaRoot);
+  const issues: string[] = [];
+  const entries: MediaFileFingerprint[] = [];
+  let directoryEntries: Dirent[];
+  try { directoryEntries = await readdir(root, { withFileTypes: true }); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ready: false, root, entries, errors: [`Media root is unavailable: ${message}`] };
+  }
+  for (const directoryEntry of [...directoryEntries].sort((left, right) => left.name.localeCompare(right.name))) {
+    if (!directoryEntry.isFile() || !keyPattern.test(directoryEntry.name)) { issues.push(`Unexpected media entry: ${directoryEntry.name}.`); continue; }
+    try {
+      const data = await readFile(path.join(root, directoryEntry.name));
+      const metadata = await sharp(data, { failOn: 'error', limitInputPixels: 36_000_000 }).metadata();
+      if (metadata.format !== 'webp' || !metadata.width || !metadata.height) { issues.push(`Media file is not a valid WebP: ${directoryEntry.name}.`); continue; }
+      entries.push({ storageKey: directoryEntry.name, sha256: createHash('sha256').update(data).digest('hex'), byteSize: data.length, widthPx: metadata.width, heightPx: metadata.height });
+    } catch { issues.push(`Media file cannot be decoded: ${directoryEntry.name}.`); }
+  }
+  return { ready: issues.length === 0, root, entries, errors: issues };
+}
+
+export function compareMediaManifests(expected: MediaFileFingerprint[], actual: MediaFileFingerprint[]): string[] {
+  const errors: string[] = [];
+  const expectedByKey = new Map<string, MediaFileFingerprint>();
+  for (const entry of expected) {
+    if (expectedByKey.has(entry.storageKey)) errors.push(`Expected media manifest contains a duplicate key: ${entry.storageKey}.`);
+    expectedByKey.set(entry.storageKey, entry);
+  }
+  const actualByKey = new Map(actual.map((entry) => [entry.storageKey, entry]));
+  for (const [key, expectedEntry] of expectedByKey) {
+    const actualEntry = actualByKey.get(key);
+    if (!actualEntry) { errors.push(`Expected media file is missing: ${key}.`); continue; }
+    if (actualEntry.sha256 !== expectedEntry.sha256 || actualEntry.byteSize !== expectedEntry.byteSize || actualEntry.widthPx !== expectedEntry.widthPx || actualEntry.heightPx !== expectedEntry.heightPx) {
+      errors.push(`Media file does not match the expected source manifest: ${key}.`);
+    }
+  }
+  for (const key of actualByKey.keys()) if (!expectedByKey.has(key)) errors.push(`Destination media file is absent from the expected source manifest: ${key}.`);
+  return errors;
+}
 
 export async function verifyMediaInventory(rows: MediaAssetRecord[], mediaRoot: string) {
   const issues: MediaVerificationIssue[] = [];

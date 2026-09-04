@@ -1,24 +1,33 @@
+import { readFile } from 'node:fs/promises';
 import { config } from '../src/config.js';
 import { pool } from '../src/db/pool.js';
-import { verifyMediaInventory, type MediaAssetRecord } from '../src/domain/media-verification.js';
+import { compareMediaManifests, mediaManifestSchema, verifyMediaInventory, type MediaAssetRecord } from '../src/domain/media-verification.js';
 
 const argumentsSet = new Set(process.argv.slice(2));
-if ([...argumentsSet].some((argument) => argument !== '--commit')) throw new Error('Usage: backfill-media-sha [--commit]');
+if ([...argumentsSet].some((argument) => argument !== '--commit' && !argument.startsWith('--expected='))) throw new Error('Usage: backfill-media-sha [--expected=/path/to/source-manifest.json] [--commit]');
 const commit = argumentsSet.has('--commit');
+const expectedArgument = [...argumentsSet].find((argument) => argument.startsWith('--expected='));
 
 type Row = MediaAssetRecord & { id: string };
 
 try {
   const result = await pool.query<Row>('SELECT id,storage_key,mime_type,byte_size,width_px,height_px,sha256,is_active FROM media_assets ORDER BY storage_key');
   const report = await verifyMediaInventory(result.rows, config.MEDIA_ROOT);
-  const blockingIssues = report.issues.filter((issue) => issue.code !== 'database_sha_missing');
+  const blockingErrors = report.issues.filter((issue) => issue.code !== 'database_sha_missing').map((issue) => issue.message);
   const missingKeys = new Set(report.issues.filter((issue) => issue.code === 'database_sha_missing').map((issue) => issue.storageKey));
   const candidates = report.manifest.filter((entry) => missingKeys.has(entry.storageKey));
-  if (blockingIssues.length) {
-    console.log(JSON.stringify({ readyForCommit: false, mode: commit ? 'commit' : 'dry-run', candidates: [], errors: blockingIssues.map((issue) => issue.message) }, null, 2));
+  let expectedEntries: ReturnType<typeof mediaManifestSchema.parse>['entries'] | null = null;
+  if (expectedArgument) {
+    expectedEntries = mediaManifestSchema.parse(JSON.parse(await readFile(expectedArgument.slice('--expected='.length), 'utf8'))).entries;
+    blockingErrors.push(...compareMediaManifests(expectedEntries, report.manifest));
+  } else if (candidates.length) {
+    blockingErrors.push('A clean source media manifest is required before legacy SHA-256 backfill.');
+  }
+  if (blockingErrors.length) {
+    console.log(JSON.stringify({ readyForCommit: false, mode: commit ? 'commit' : 'dry-run', sourceManifestCompared: Boolean(expectedEntries), candidates: [], errors: blockingErrors }, null, 2));
     process.exitCode = 1;
   } else if (!commit) {
-    console.log(JSON.stringify({ readyForCommit: true, complete: candidates.length === 0, mode: 'dry-run', candidates, writes: 0, errors: [] }, null, 2));
+    console.log(JSON.stringify({ readyForCommit: true, complete: candidates.length === 0, mode: 'dry-run', sourceManifestCompared: Boolean(expectedEntries), candidates, writes: 0, errors: [] }, null, 2));
   } else {
     const ids = new Map(result.rows.map((row) => [row.storage_key, row.id]));
     const client = await pool.connect();
@@ -40,8 +49,9 @@ try {
     }
     const verifiedRows = await pool.query<MediaAssetRecord>('SELECT storage_key,mime_type,byte_size,width_px,height_px,sha256,is_active FROM media_assets ORDER BY storage_key');
     const verified = await verifyMediaInventory(verifiedRows.rows, config.MEDIA_ROOT);
-    console.log(JSON.stringify({ ready: verified.ready, mode: 'commit', candidates, writes: candidates.length, errors: verified.errors }, null, 2));
-    if (!verified.ready) process.exitCode = 1;
+    const errors = [...verified.errors, ...(expectedEntries ? compareMediaManifests(expectedEntries, verified.manifest) : [])];
+    console.log(JSON.stringify({ ready: errors.length === 0, mode: 'commit', sourceManifestCompared: Boolean(expectedEntries), candidates, writes: candidates.length, errors }, null, 2));
+    if (errors.length) process.exitCode = 1;
   }
 } finally {
   await pool.end();

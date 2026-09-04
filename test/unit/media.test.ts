@@ -5,7 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import { processOrganizationImage, removeUncommittedImage } from '../../src/services/media.js';
-import { verifyMediaInventory } from '../../src/domain/media-verification.js';
+import { compareMediaManifests, inventoryMediaDirectory, mediaManifestSchema, verifyMediaInventory } from '../../src/domain/media-verification.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -51,6 +51,21 @@ describe('media inventory verification', () => {
     }], root);
     expect(report).toMatchObject({ ready: true, databaseRows: 1, files: 1, errors: [] });
     expect(report.manifest[0]).toMatchObject({ storageKey: key, widthPx: 320, heightPx: 240, active: true });
+  });
+
+  it('creates a deterministic source manifest and detects transfer drift', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'seedexchange-media-'));
+    temporaryDirectories.push(root);
+    const key = `${'d'.repeat(40)}.webp`;
+    const data = await sharp({ create: { width: 240, height: 180, channels: 3, background: '#315f45' } }).webp().toBuffer();
+    await writeFile(path.join(root, key), data);
+    const source = await inventoryMediaDirectory(root);
+    expect(source).toMatchObject({ ready: true, errors: [] });
+    expect(compareMediaManifests(source.entries, source.entries)).toEqual([]);
+    expect(compareMediaManifests(source.entries, [{ ...source.entries[0], sha256: '0'.repeat(64) }]))
+      .toEqual([`Media file does not match the expected source manifest: ${key}.`]);
+    expect(compareMediaManifests(source.entries, [])).toEqual([`Expected media file is missing: ${key}.`]);
+    expect(() => mediaManifestSchema.parse({ ready: false, version: 1, entries: source.entries, errors: ['incomplete'] })).toThrow();
   });
 
   it('fails closed for missing hashes, metadata drift and orphan files', async () => {
