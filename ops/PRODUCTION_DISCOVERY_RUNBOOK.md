@@ -107,7 +107,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    SEEDX_PRODUCTION_DISCOVERY_ACTIVATE_APPROVED=YES bash ops/activate-production-discovery.sh <40-char-commit> 003_discovery_migration_scope.sql /secure/source-media-manifest.json /directory/<slug> /product/<slug> /media/<key>.webp
    ```
 
-   The runtime portion sends only GET requests with `Host: seedexchange.online`. It requires production security headers, canonical URLs, the discovery payment notice, an external-only product action, sitemap membership and non-empty WebP media. Only after those checks pass does activation run one sitemap/outbox cycle and enable the web service plus the two production timers. Activation does not install or run a marketplace worker and does not change Caddy or DNS.
+   The runtime portion sends only GET requests with `Host: seedexchange.online`. It requires production security headers, canonical URLs, the discovery payment notice, an external-only product action, sitemap membership and non-empty WebP media. Only after those checks pass does activation run one sitemap/outbox cycle and a sanitized operational observation. That observation must confirm the migration and dedicated database, safe connection capacity, no long-running or idle-in-transaction sessions, no failed/stale outbox work and a fresh sitemap containing the representative organization and product. The activation then enables the web service plus the two production timers. It does not install or run a marketplace worker and does not change Caddy or DNS.
 3. Run the public acceptance suite with `PLAYWRIGHT_EXPECT_LAUNCH_PHASE=discovery` and `PLAYWRIGHT_EXPECT_MIGRATION=003_discovery_migration_scope.sql`. It must confirm all four commerce capability flags are false and that cart add/remove, checkout, Stripe webhook, seller product/shipping/order and ordinary product-moderation mutations return 404 before authentication or CSRF handling.
 4. Verify administrator login and batch moderation without creating orders or enabling payment flags.
 5. Run responsive and accessibility checks at 375, 768 and 1440 px. Inspect logs and resource usage.
@@ -118,7 +118,13 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 2. Install the reviewed production Caddy block, validate and reload Caddy. Change root and `www` DNS to the VPS only after loopback acceptance passes.
 3. Verify authoritative DNS, TLS, canonical URLs, live pages, external links, sitemap, logs and the discovery capability report from at least two external resolvers.
 4. If a blocking fault appears, restore the recorded Hostinger DNS values and keep the PHP release/database/uploads unchanged. Do not attempt a partial data rollback.
-5. Observe errors, latency, database connections, sitemap, external links and moderation for 24 hours before accepting phase 1.
+5. Repeat the sanitized observation immediately after public cutover, periodically during the window and at or after 24 hours. Use a new output path for each run and record the emitted report SHA-256 with the operator log:
+
+   ```bash
+   npm run verify:production-observation -- --migration=003_discovery_migration_scope.sql --organization=/directory/<slug> --product=/product/<slug> --output=/secure/observation-<timestamp>.json
+   ```
+
+   A report contains operational counts and status only, not connection strings, recipient addresses, message bodies or queries. `ready: false`, a non-zero exit, application errors, latency regression, invalid external links or moderation failure blocks phase-1 acceptance and triggers the approved rollback decision.
 
 ## Phase 2 remains separate
 
