@@ -13,9 +13,9 @@ describe.skipIf(!databaseUrl)('PostgreSQL migrations', () => {
     close = () => pool.end();
     const first = await migrate();
     const second = await migrate();
-    expect(first.applied).toEqual(['001_platform.sql', '002_legacy_compatibility.sql']);
+    expect(first.applied).toEqual(['001_platform.sql', '002_legacy_compatibility.sql', '003_discovery_migration_scope.sql']);
     expect(second.applied).toEqual([]);
-    expect(second.current).toBe('002_legacy_compatibility.sql');
+    expect(second.current).toBe('003_discovery_migration_scope.sql');
     const tables = await pool.query<{ total: string }>("SELECT count(*)::text total FROM information_schema.tables WHERE table_schema='public'");
     expect(Number(tables.rows[0].total)).toBeGreaterThan(30);
   });

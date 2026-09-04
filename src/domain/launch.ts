@@ -43,10 +43,11 @@ export function publicProductModes(isCommerceEnabled: boolean): readonly string[
   return isCommerceEnabled ? ['external', 'marketplace'] : ['external'];
 }
 
-export function validateLaunchReadiness(body: LaunchReadiness, expectedPhase: LaunchPhase): string[] {
+export function validateLaunchReadiness(body: LaunchReadiness, expectedPhase: LaunchPhase, expectedMigration?: string): string[] {
   const errors: string[] = [];
   if (body.status !== 'ready' || body.database !== 'ok' || !body.migration) errors.push('Readiness did not confirm the database and migration.');
   if (body.launchPhase !== expectedPhase) errors.push(`Expected launch phase ${expectedPhase}, received ${String(body.launchPhase)}.`);
+  if (expectedMigration && body.migration !== expectedMigration) errors.push(`Expected migration ${expectedMigration}, received ${String(body.migration)}.`);
   if (expectedPhase === 'discovery' && (body.commerceEnabled || body.connectEnabled || body.marketplacePaymentsEnabled || body.payoutWorkerEnabled)) {
     errors.push('Discovery readiness exposed an enabled commerce capability.');
   }

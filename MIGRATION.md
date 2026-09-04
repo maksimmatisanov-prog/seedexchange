@@ -100,6 +100,15 @@ All operational package commands now compile and exist. Payment flags remain off
 - An isolated PostgreSQL 14 integration run applied both migrations, committed one normalized feed row, produced the same SHA-256 snapshot in dry-run and write modes, created a one-item pending batch and activated it only after moderation. The resulting product was `active`, `external`, `current`, linked to its publication batch and carried the expected referral URL.
 - The same isolated run held an editorial title change as `review_required`, applied it only through a separate content-review batch, and rejected a later approval after the staged supplier snapshot was deliberately changed. Both preparation and moderation audit events were present. The temporary database cluster was stopped and removed afterward.
 
+## Discovery data-migration boundary from 2026-09-04
+
+- The legacy migration command now defaults to `--scope=discovery`. This scope includes accounts required by organization ownership, organizations, media metadata, external supplier/catalog batches, external products, exchange listings, organization channels, conversations and audit history.
+- Discovery explicitly excludes shipping, orders, reservations, Stripe events, seller transfers, delivery cases and review entities. It refuses to start against a target containing commerce records, selects only `purchase_mode='external'` products and validates their HTTPS destination before insertion.
+- Imported organizations have `marketplace_enabled`, Stripe account, charge and payout capabilities reset even if legacy rows contain enabled values. Runtime discovery flags remain a separate fail-closed gate.
+- Inventory fingerprints now include a SHA-256 checksum of every selected source row rather than counts alone. Import parity compares each source table with its mapped target, including differently named tables in the later full scope.
+- This is a local migration-contract change. No production source was connected, inventoried or imported, and no staging data changed.
+- PostgreSQL 14 applied migrations `001`–`003` on an empty temporary database and a repeat run applied zero files. The deploy verifier now also requires `/ready` to report the latest migration bundled in the release, preventing activation on an older schema.
+
 ## Identity and RBAC evidence from 2026-09-03
 
 - Seller workspace authorization now follows the shared domain rule: organization administrators and platform administrators are allowed, while buyers, non-members and ordinary organization members receive 403.

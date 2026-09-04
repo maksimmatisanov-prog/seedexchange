@@ -21,6 +21,7 @@ describe('launch phase rules', () => {
 
   it('verifies the runtime phase before a release is accepted', () => {
     expect(validateLaunchReadiness({ status: 'ready', database: 'ok', migration: '002.sql', launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }, 'discovery')).toEqual([]);
+    expect(validateLaunchReadiness({ status: 'ready', database: 'ok', migration: '002.sql', launchPhase: 'discovery' }, 'discovery', '003.sql')).toContain('Expected migration 003.sql, received 002.sql.');
     expect(validateLaunchReadiness({ status: 'ready', database: 'ok', migration: '002.sql', launchPhase: 'discovery', commerceEnabled: true }, 'discovery')).toContain('Discovery readiness exposed an enabled commerce capability.');
     expect(validateLaunchReadiness({ status: 'ready', database: 'ok', migration: '002.sql', launchPhase: 'discovery' }, 'commerce')).toContain('Expected launch phase commerce, received discovery.');
   });

@@ -21,6 +21,17 @@ npm start
 
 The default local URL is `http://localhost:4000`. Configuration is read from environment variables or an ignored `.env` file. Never commit credentials.
 
+Discovery-phase data operations are dry-run first:
+
+```powershell
+npm run migrate-legacy -- --inventory --scope=discovery
+npm run migrate-legacy -- --dry-run --scope=discovery
+npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
+npm run prepare:supplier-batch -- --limit=200
+```
+
+`migrate-legacy` defaults to the discovery scope. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. The full scope contains commerce history and must not be used for the discovery launch.
+
 ## Repository map
 
 - `src/app.ts`: Fastify composition and security headers.
