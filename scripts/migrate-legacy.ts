@@ -8,6 +8,7 @@ import {
   quoteMysqlIdentifier,
   quotePostgresIdentifier,
   sanitizeLegacyRow,
+  validateLegacySourceContract,
   validateDiscoveryRow,
   type LegacyMigrationScope,
   type LegacyTablePlan,
@@ -33,6 +34,7 @@ if (!config.LEGACY_MYSQL_URL) throw new Error('LEGACY_MYSQL_URL is required.');
 
 const source = await mysql.createConnection({ uri: config.LEGACY_MYSQL_URL, decimalNumbers: false, supportBigNumbers: true, bigNumberStrings: true });
 const target = mode === 'inventory' ? null : new Pool({ connectionString: config.DATABASE_URL, max: 2 });
+const sourceSnapshot = 'repeatable-read-read-only';
 
 async function existingSourceTables(): Promise<Set<string>> {
   const [rows] = await source.query<mysql.RowDataPacket[]>(`SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() AND table_type='BASE TABLE'`);
@@ -44,9 +46,19 @@ async function sourceColumns(table: string): Promise<string[]> {
   return rows.map((row) => String(row.COLUMN_NAME ?? row.column_name));
 }
 
-async function targetColumns(client: PoolClient, table: string): Promise<Map<string, string>> {
-  const result = await client.query<{ column_name: string; data_type: string }>(`SELECT column_name,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position`, [table]);
-  return new Map(result.rows.map((row) => [row.column_name, row.data_type]));
+type TargetColumn = { dataType: string; nullable: boolean; hasDefault: boolean; identity: boolean };
+
+async function targetColumns(client: PoolClient, table: string): Promise<Map<string, TargetColumn>> {
+  const result = await client.query<{ column_name: string; data_type: string; is_nullable: string; column_default: string | null; is_identity: string }>(
+    `SELECT column_name,data_type,is_nullable,column_default,is_identity FROM information_schema.columns
+     WHERE table_schema='public' AND table_name=$1 ORDER BY ordinal_position`, [table],
+  );
+  return new Map(result.rows.map((row) => [row.column_name, {
+    dataType: row.data_type,
+    nullable: row.is_nullable === 'YES',
+    hasDefault: row.column_default !== null,
+    identity: row.is_identity === 'YES',
+  }]));
 }
 
 function convert(value: SourceRow[string], dataType: string): unknown {
@@ -62,7 +74,7 @@ function convert(value: SourceRow[string], dataType: string): unknown {
   return value;
 }
 
-type InventoryEntry = { count: number; checksum: string };
+type InventoryEntry = { count: number; checksum: string; columns: string[] };
 
 function fingerprintValue(value: unknown): string | number | boolean | null {
   if (value === null || value === undefined) return null;
@@ -73,17 +85,30 @@ function fingerprintValue(value: unknown): string | number | boolean | null {
   return value as string | number | boolean;
 }
 
-async function inventory(plans: LegacyTablePlan[]): Promise<Record<string, InventoryEntry>> {
+async function inventory(plans: LegacyTablePlan[], columnsByTable: ReadonlyMap<string, readonly string[]>): Promise<Record<string, InventoryEntry>> {
   const result: Record<string, InventoryEntry> = {};
   for (const table of plans) {
-    const columns = await sourceColumns(table.source);
+    const columns = [...(columnsByTable.get(table.source) ?? [])];
     const where = table.where ? ` WHERE ${table.where}` : '';
     const [rows] = await source.query<mysql.RowDataPacket[]>(`SELECT ${columns.map(quoteMysqlIdentifier).join(',')} FROM ${quoteMysqlIdentifier(table.source)}${where} ORDER BY ${quoteMysqlIdentifier(columns[0])}`);
     const hash = createHash('sha256');
     for (const row of rows) hash.update(JSON.stringify(columns.map((column) => fingerprintValue(row[column])))).update('\n');
-    result[table.source] = { count: rows.length, checksum: hash.digest('hex') };
+    result[table.source] = { count: rows.length, checksum: hash.digest('hex'), columns };
   }
   return result;
+}
+
+async function compatibleColumns(client: PoolClient, plan: LegacyTablePlan, sourceNames: readonly string[]) {
+  const targetNames = await targetColumns(client, plan.target);
+  const columns = sourceNames.filter((name) => targetNames.has(name));
+  const sourceOnly = sourceNames.filter((name) => !targetNames.has(name));
+  const targetRequiredButUnmapped = [...targetNames.entries()]
+    .filter(([name, metadata]) => !sourceNames.includes(name) && !metadata.nullable && !metadata.hasDefault && !metadata.identity)
+    .map(([name]) => name);
+  if (sourceOnly.length) throw new Error(`Source table ${plan.source} has unmapped columns: ${sourceOnly.join(', ')}.`);
+  if (targetRequiredButUnmapped.length) throw new Error(`Target table ${plan.target} has required unmapped columns: ${targetRequiredButUnmapped.join(', ')}.`);
+  if (!columns.length) throw new Error(`No compatible columns for ${plan.source}.`);
+  return { targetNames, columns, sourceOnly, targetOnly: [...targetNames.keys()].filter((name) => !sourceNames.includes(name)) };
 }
 
 async function ensureEmptyTarget(client: PoolClient, plans: LegacyTablePlan[]): Promise<void> {
@@ -102,9 +127,7 @@ async function ensureEmptyTarget(client: PoolClient, plans: LegacyTablePlan[]): 
 
 async function importTable(client: PoolClient, plan: LegacyTablePlan): Promise<number> {
   const sourceNames = await sourceColumns(plan.source);
-  const targetNames = await targetColumns(client, plan.target);
-  const columns = sourceNames.filter((name) => targetNames.has(name));
-  if (!columns.length) throw new Error(`No compatible columns for ${plan.source}.`);
+  const { targetNames, columns } = await compatibleColumns(client, plan, sourceNames);
   const where = plan.where ? ` WHERE ${plan.where}` : '';
   const [rows] = await source.query<mysql.RowDataPacket[]>(`SELECT ${columns.map(quoteMysqlIdentifier).join(',')} FROM ${quoteMysqlIdentifier(plan.source)}${where} ORDER BY 1`);
   let imported = 0;
@@ -112,14 +135,17 @@ async function importTable(client: PoolClient, plan: LegacyTablePlan): Promise<n
     const row = sanitizeLegacyRow(scope, plan.target, sourceRow as Record<string, unknown>);
     const discoveryErrors = scope === 'discovery' ? validateDiscoveryRow(plan.target, row) : [];
     if (discoveryErrors.length) throw new Error(`${plan.source} row failed discovery validation: ${discoveryErrors.join(' ')}`);
-    const values = columns.map((column) => convert(row[column] as SourceRow[string], targetNames.get(column)!));
+    const values = columns.map((column) => convert(row[column] as SourceRow[string], targetNames.get(column)!.dataType));
     const placeholders = columns.map((_, index) => `$${index + 1}`).join(',');
     const conflict = plan.target === 'founder_program_state' ? ' ON CONFLICT (id) DO UPDATE SET current_slot=EXCLUDED.current_slot,updated_at=EXCLUDED.updated_at' : '';
     await client.query(`INSERT INTO ${quotePostgresIdentifier(plan.target)} (${columns.map(quotePostgresIdentifier).join(',')}) VALUES (${placeholders})${conflict}`, values);
     imported++;
   }
   if (targetNames.has('id')) {
-    await client.query(`SELECT setval(pg_get_serial_sequence($1,'id'),COALESCE((SELECT MAX(id) FROM ${quotePostgresIdentifier(plan.target)}),1),true)`, [plan.target]);
+    const sequence = await client.query<{ sequence_name: string | null }>('SELECT pg_get_serial_sequence($1,$2) sequence_name', [plan.target, 'id']);
+    if (sequence.rows[0]?.sequence_name) {
+      await client.query(`SELECT setval($1::regclass,COALESCE((SELECT MAX(id) FROM ${quotePostgresIdentifier(plan.target)}),1),(SELECT COUNT(*)>0 FROM ${quotePostgresIdentifier(plan.target)}))`, [sequence.rows[0].sequence_name]);
+    }
   }
   return imported;
 }
@@ -140,26 +166,36 @@ async function verifyOrphans(client: PoolClient): Promise<Record<string, number>
 
 let exitCode = 0;
 try {
+  await source.query('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+  await source.query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
   const available = await existingSourceTables();
-  const plans = tablePlan.filter((item) => available.has(item.source));
-  const sourceInventory = await inventory(plans);
+  const columnsByTable = new Map<string, string[]>();
+  for (const plan of tablePlan) {
+    if (available.has(plan.source)) columnsByTable.set(plan.source, await sourceColumns(plan.source));
+  }
+  const contractErrors = validateLegacySourceContract(tablePlan, available, columnsByTable);
+  if (contractErrors.length) throw new Error(`Legacy source contract failed: ${contractErrors.join(' ')}`);
+  const plans = tablePlan;
+  const sourceInventory = await inventory(plans, columnsByTable);
   const sourceFingerprint = createHash('sha256').update(JSON.stringify(sourceInventory)).digest('hex');
   if (mode === 'inventory') {
-    console.log(JSON.stringify({ mode, scope, sourceFingerprint, tables: sourceInventory }, null, 2));
+    console.log(JSON.stringify({ mode, scope, sourceSnapshot, sourceFingerprint, tables: sourceInventory }, null, 2));
   } else {
     const client = await target!.connect();
     const runId = randomUUID();
     try {
       await ensureEmptyTarget(client, plans);
       if (mode === 'dry-run') {
-        const compatibility: Record<string, string[]> = {};
+        const compatibility: Record<string, { importedColumns: string[]; sourceOnlyColumns: string[]; targetOnlyColumns: string[] }> = {};
         for (const plan of plans) {
-          const sourceNames = await sourceColumns(plan.source);
-          const targetNames = await targetColumns(client, plan.target);
-          compatibility[plan.source] = sourceNames.filter((name) => targetNames.has(name));
-          if (!compatibility[plan.source].length) throw new Error(`No compatible columns for ${plan.source}.`);
+          const result = await compatibleColumns(client, plan, columnsByTable.get(plan.source)!);
+          compatibility[plan.source] = {
+            importedColumns: result.columns,
+            sourceOnlyColumns: result.sourceOnly,
+            targetOnlyColumns: result.targetOnly,
+          };
         }
-        console.log(JSON.stringify({ mode, scope, runId, sourceFingerprint, tables: sourceInventory, compatibility }, null, 2));
+        console.log(JSON.stringify({ mode, scope, sourceSnapshot, runId, sourceFingerprint, tables: sourceInventory, compatibility }, null, 2));
       } else {
         await client.query('BEGIN');
         await client.query(`INSERT INTO legacy_migration_runs(id,source_fingerprint,scope,mode,status,source_inventory) VALUES($1,$2,$3,'import','running',$4::jsonb)`, [runId, sourceFingerprint, scope, JSON.stringify(sourceInventory)]);
@@ -171,7 +207,7 @@ try {
         if (mismatches.length || Object.values(orphans).some((count) => count !== 0)) throw new Error(`Parity verification failed: ${JSON.stringify({ mismatches, orphans })}`);
         await client.query(`UPDATE legacy_migration_runs SET status='succeeded',imported_counts=$2::jsonb,verification_report=$3::jsonb,completed_at=now() WHERE id=$1`, [runId, JSON.stringify(importedCounts), JSON.stringify({ orphans })]);
         await client.query('COMMIT');
-        console.log(JSON.stringify({ mode, scope, runId, sourceFingerprint, importedCounts, orphans }, null, 2));
+        console.log(JSON.stringify({ mode, scope, sourceSnapshot, runId, sourceFingerprint, importedCounts, orphans }, null, 2));
       }
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
@@ -182,6 +218,7 @@ try {
   exitCode = 1;
   console.error(error instanceof Error ? error.message : String(error));
 } finally {
+  await source.rollback().catch(() => undefined);
   await source.end();
   await target?.end();
   process.exitCode = exitCode;

@@ -34,7 +34,7 @@ npm run backfill:media-sha
 npm run manifest:media -- --root=<restored-legacy-uploads> --output=<secure-manifest.json>
 ```
 
-`migrate-legacy` defaults to the discovery scope. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. `backfill:media-sha` is read-only by default and writes only with `-- --commit`, after all non-SHA media metadata and the required clean source manifest have matched. The full scope contains commerce history and must not be used for the discovery launch.
+`migrate-legacy` defaults to the discovery scope. It requires the reviewed legacy tables and semantic columns and reads the source through one repeatable, read-only consistent snapshot; schema drift stops dry-run/import instead of silently dropping fields. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. `backfill:media-sha` is read-only by default and writes only with `-- --commit`, after all non-SHA media metadata and the required clean source manifest have matched. The full scope contains commerce history and must not be used for the discovery launch.
 
 ## Repository map
 

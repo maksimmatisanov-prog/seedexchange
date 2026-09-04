@@ -5,6 +5,7 @@ import {
   quoteMysqlIdentifier,
   quotePostgresIdentifier,
   sanitizeLegacyRow,
+  validateLegacySourceContract,
   validateDiscoveryRow,
 } from '../../src/domain/legacy-migration.js';
 
@@ -31,6 +32,21 @@ describe('two-stage legacy migration contract', () => {
     const productPlan = legacyPlansForScope('discovery').find((plan) => plan.target === 'products');
     expect(productPlan?.where).toBe("purchase_mode='external'");
     expect(legacyPlansForScope('full').find((plan) => plan.target === 'products')?.where).toBeUndefined();
+  });
+
+  it('defines and enforces a required discovery source schema', () => {
+    const plans = legacyPlansForScope('discovery');
+    expect(plans.every((plan) => (plan.requiredSourceColumns?.length ?? 0) > 0)).toBe(true);
+    const available = new Set(plans.map((plan) => plan.source));
+    const columns = new Map(plans.map((plan) => [plan.source, [...plan.requiredSourceColumns!]]));
+    expect(validateLegacySourceContract(plans, available, columns)).toEqual([]);
+
+    available.delete('products');
+    columns.set('users', columns.get('users')!.filter((column) => column !== 'email_verified_at'));
+    expect(validateLegacySourceContract(plans, available, columns)).toEqual(expect.arrayContaining([
+      'Required source table products is missing.',
+      'Source table users is missing required columns: email_verified_at.',
+    ]));
   });
 
   it('removes organization payment capabilities during discovery import', () => {

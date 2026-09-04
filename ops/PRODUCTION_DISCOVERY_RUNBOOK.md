@@ -21,7 +21,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    npm run migrate-legacy -- --inventory --scope=discovery
    ```
 
-4. Require equal per-table counts, checksums and the combined `sourceFingerprint`. Investigate any drift before creating a backup.
+4. Confirm both outputs report `sourceSnapshot=repeatable-read-read-only`. Require equal ordered column lists, per-table counts, checksums and the combined `sourceFingerprint`. A missing required table/column or any drift blocks the run before creating a backup.
 5. Record approved organizations, verified administrators, active exchanges, active external products, media rows/files, open supplier batches and failed sitemap batches.
 
 ## 2. Recoverable backup
@@ -47,7 +47,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    npm run migrate-legacy -- --dry-run --scope=discovery
    ```
 
-2. Require the two dry runs and the final source inventory to have identical counts and fingerprints.
+2. Require the two dry runs and the final source inventory to have identical ordered column lists, counts and fingerprints. Review every `targetOnlyColumns` entry; any `sourceOnlyColumns`, required target-only field or unreviewed schema difference blocks import.
 3. After explicit import approval, run exactly once:
 
    ```bash
