@@ -4,6 +4,11 @@ import { expect, test } from '@playwright/test';
 const publicPaths = ['/', '/directory', '/marketplace', '/exchange', '/search', '/about', '/pricing', '/economics', '/terms', '/privacy'];
 const expectedLaunchPhase = process.env.PLAYWRIGHT_EXPECT_LAUNCH_PHASE ?? 'discovery';
 const expectedMigration = process.env.PLAYWRIGHT_EXPECT_MIGRATION;
+const legacySitemapRedirects = [
+  ['/directory/', '/directory'], ['/marketplace/', '/marketplace'], ['/exchange/', '/exchange'],
+  ['/about/', '/about'], ['/pricing/', '/pricing'], ['/economics/', '/economics'],
+  ['/terms/', '/terms'], ['/privacy/', '/privacy'],
+] as const;
 
 test('public pages render and local navigation is not broken', async ({ page, request }, testInfo) => {
   const localHrefs = new Set<string>();
@@ -44,6 +49,15 @@ test('primary navigation matches the responsive breakpoint', async ({ page }) =>
 
   await expect(menuButton).toBeHidden();
   await expect(navigation).toBeVisible();
+});
+
+test('production sitemap paths permanently redirect to Node canonicals', async ({ request }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop-1440', 'The route contract is viewport-independent.');
+  for (const [legacyPath, canonicalPath] of legacySitemapRedirects) {
+    const response = await request.get(`${legacyPath}?source=legacy-sitemap`, { maxRedirects: 0 });
+    expect(response.status(), legacyPath).toBe(301);
+    expect(response.headers().location, legacyPath).toBe(`${canonicalPath}?source=legacy-sitemap`);
+  }
 });
 
 test('home has no serious accessibility violations', async ({ page }) => {
