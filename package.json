@@ -28,6 +28,8 @@
     "verify:media": "node dist/scripts/verify-media.js",
     "backfill:media-sha": "node dist/scripts/backfill-media-sha.js",
     "manifest:media": "node dist/scripts/media-manifest.js",
+    "manifest:discovery-backup": "node dist/scripts/discovery-backup-manifest.js",
+    "verify:discovery-backup": "node dist/scripts/verify-discovery-backup.js",
     "sync:oreshka": "node dist/scripts/sync-oreshka.js",
     "prepare:supplier-batch": "node dist/scripts/prepare-supplier-batch.js",
     "migrate-legacy": "node dist/scripts/migrate-legacy.js"

@@ -28,9 +28,21 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 ## 2. Recoverable backup
 
 1. Back up the Hostinger MySQL database, private uploads and exact deployed PHP release together.
-2. Record byte size and SHA-256 for every artifact. Restore all artifacts into an isolated environment and verify representative records and files.
-3. Record the current Hostinger DNS address and export the pre-cutover DNS zone when available.
-4. Do not proceed when the restore rehearsal, checksums or inventory reconciliation fail.
+2. Package the database dump, private uploads and exact PHP release as three distinct non-empty regular files. Create an exclusive manifest without reading their contents into application memory:
+
+   ```bash
+   npm run manifest:discovery-backup -- --mysql-dump=/secure/database.sql.gz --uploads-archive=/secure/uploads.tar.gz --legacy-release=/secure/legacy-release.tar.gz --output=/secure/discovery-backup-manifest.json
+   ```
+
+3. Copy the three artifacts and manifest into the isolated restore environment, then verify their names, byte sizes and SHA-256 before extraction:
+
+   ```bash
+   npm run verify:discovery-backup -- --manifest=/secure/discovery-backup-manifest.json --mysql-dump=/secure/database.sql.gz --uploads-archive=/secure/uploads.tar.gz --legacy-release=/secure/legacy-release.tar.gz
+   ```
+
+4. Require `ready: true` and record the manifest's own SHA-256. Restore all artifacts and verify representative database records, uploads and the PHP release separately; artifact integrity alone does not prove a successful restore.
+5. Record the current Hostinger DNS address and export the pre-cutover DNS zone when available.
+6. Do not proceed when the restore rehearsal, checksums or inventory reconciliation fail.
 
 ## 3. Prepare the isolated Node production target
 

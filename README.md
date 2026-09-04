@@ -28,6 +28,8 @@ npm run migrate-legacy -- --inventory --scope=discovery
 npm run migrate-legacy -- --dry-run --scope=discovery
 npm run verify:discovery-rehearsal -- --inventory=<inventory-1.json> --inventory=<inventory-2.json> --dry-run=<dry-run-1.json> --dry-run=<dry-run-2.json>
 npm run verify:production-env -- --file=<private-production.env>
+npm run manifest:discovery-backup -- --mysql-dump=<absolute-file> --uploads-archive=<absolute-file> --legacy-release=<absolute-file> --output=<absolute-new.json>
+npm run verify:discovery-backup -- --manifest=<absolute.json> --mysql-dump=<absolute-file> --uploads-archive=<absolute-file> --legacy-release=<absolute-file>
 npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
 npm run prepare:supplier-batch -- --limit=200
 npm run verify:discovery-data
