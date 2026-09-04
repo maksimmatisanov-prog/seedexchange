@@ -100,14 +100,14 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
 
 ## 5. Private runtime acceptance
 
-1. Install the reviewed production systemd unit but keep it stopped and keep Caddy and DNS unchanged. Record one approved organization slug, external product slug and first-party media key from the verified migration.
+1. After explicit unit-install approval, copy the five exact files from the prepared release's `ops/systemd/production/` directory to `/etc/systemd/system/`, preserving their names and mode `0644`. Run `systemd-analyze verify` on all five installed files, then `systemctl daemon-reload`. Keep the web service and both timers stopped. The bundle contains only the production web service, outbox delivery and sitemap generation; there is deliberately no production marketplace worker. Record one approved organization slug, external product slug and first-party media key from the verified migration. Activation rejects modified unit files and any systemd drop-ins.
 2. After separate explicit activation approval, activate only the prepared commit. The command re-verifies the release, environment, source media manifest and discovery database before switching `current`; after restart it requires readiness plus the full read-only runtime gate. A failed restart or gate restores the previous application symlink and service (or stops the first deployment):
 
    ```bash
    SEEDX_PRODUCTION_DISCOVERY_ACTIVATE_APPROVED=YES bash ops/activate-production-discovery.sh <40-char-commit> 003_discovery_migration_scope.sql /secure/source-media-manifest.json /directory/<slug> /product/<slug> /media/<key>.webp
    ```
 
-   The runtime portion sends only GET requests with `Host: seedexchange.online`. It requires production security headers, canonical URLs, the discovery payment notice, an external-only product action, sitemap membership and non-empty WebP media. Activation does not change Caddy or DNS.
+   The runtime portion sends only GET requests with `Host: seedexchange.online`. It requires production security headers, canonical URLs, the discovery payment notice, an external-only product action, sitemap membership and non-empty WebP media. Only after those checks pass does activation run one sitemap/outbox cycle and enable the web service plus the two production timers. Activation does not install or run a marketplace worker and does not change Caddy or DNS.
 3. Run the public acceptance suite with `PLAYWRIGHT_EXPECT_LAUNCH_PHASE=discovery` and `PLAYWRIGHT_EXPECT_MIGRATION=003_discovery_migration_scope.sql`. It must confirm all four commerce capability flags are false and that cart add/remove, checkout, Stripe webhook, seller product/shipping/order and ordinary product-moderation mutations return 404 before authentication or CSRF handling.
 4. Verify administrator login and batch moderation without creating orders or enabling payment flags.
 5. Run responsive and accessibility checks at 375, 768 and 1440 px. Inspect logs and resource usage.

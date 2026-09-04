@@ -1,21 +1,3 @@
-[Unit]
-Description=Seedexchange production discovery service
-After=network.target postgresql.service
-
-[Service]
-Type=simple
-User=seedexchange
-Group=seedexchange
-WorkingDirectory=/srv/seedexchange-production/current
-EnvironmentFile=/srv/seedexchange-production/shared/production.env
-ExecStart=/usr/bin/node dist/src/server.js
-Restart=on-failure
-RestartSec=5
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/srv/seedexchange-production/shared/storage
-
-[Install]
-WantedBy=multi-user.target
+# Deprecated placeholder. Do not install this file.
+# The exact production discovery unit bundle is versioned and release-manifested under:
+# ops/systemd/production/

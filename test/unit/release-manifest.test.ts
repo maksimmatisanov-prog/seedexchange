@@ -20,6 +20,11 @@ async function createReleaseRoot(): Promise<string> {
     'dist/scripts/verify-release-manifest.js': 'export {};',
     'dist/scripts/verify-ready.js': 'export {};',
     'dist/scripts/verify-discovery-runtime.js': 'export {};',
+    'ops/systemd/production/seedexchange-production.service': '[Service]',
+    'ops/systemd/production/seedexchange-production-outbox.service': '[Service]',
+    'ops/systemd/production/seedexchange-production-outbox.timer': '[Timer]',
+    'ops/systemd/production/seedexchange-production-sitemap.service': '[Service]',
+    'ops/systemd/production/seedexchange-production-sitemap.timer': '[Timer]',
     'public/assets/app.css': 'body{}',
     'src/templates/layouts/base.ejs': '<main></main>',
   };

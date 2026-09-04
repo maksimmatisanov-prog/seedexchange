@@ -53,9 +53,10 @@ jobs:
         run: |
           set -Eeuo pipefail
           release_root="$RUNNER_TEMP/seedexchange-production-discovery"
-          mkdir -p "$release_root/src"
+          mkdir -p "$release_root/src" "$release_root/ops/systemd"
           cp -a dist public "$release_root/"
           cp -a src/templates "$release_root/src/"
+          cp -a ops/systemd/production "$release_root/ops/systemd/"
           cp package.json package-lock.json .nvmrc "$release_root/"
           git_tree="$(git rev-parse 'HEAD^{tree}')"
           node dist/scripts/create-release-manifest.js --root="$release_root" --commit="$GITHUB_SHA" --tree="$git_tree" --output="$release_root/RELEASE.json"

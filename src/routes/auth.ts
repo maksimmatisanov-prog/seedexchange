@@ -2,7 +2,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { config } from '../config.js';
 import { pool } from '../db/pool.js';
+import { buildAuthActionUrl } from '../domain/auth-links.js';
 import { canTransitionSellerOrder } from '../domain/rules.js';
 import { pageModel } from '../lib/view.js';
 import { audit } from '../services/audit.js';
@@ -41,7 +43,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       const token = randomBytes(32).toString('hex');
       const hash = createHash('sha256').update(token).digest('hex');
       await client.query(`INSERT INTO auth_tokens(user_id,purpose,token_hash,expires_at) VALUES($1,'email_verification',$2,now()+interval '24 hours')`, [created.rows[0].id, hash]);
-      await client.query('INSERT INTO outbox_messages(event_key,recipient,subject,body) VALUES($1,$2,$3,$4)', [`verify:${created.rows[0].id}:${hash}`, form.email, 'Verify your Seedexchange email', `Verify your email: /auth/verify?token=${token}`]);
+      await client.query('INSERT INTO outbox_messages(event_key,recipient,subject,body) VALUES($1,$2,$3,$4)', [`verify:${created.rows[0].id}:${hash}`, form.email, 'Verify your Seedexchange email', `Verify your email: ${buildAuthActionUrl(config.APP_URL, 'email_verification', token)}`]);
       await client.query('COMMIT');
       await rotateSession(request, reply, created.rows[0].id);
       await audit(created.rows[0].id, 'user', created.rows[0].id, 'user.registered');
@@ -91,7 +93,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       const hash = createHash('sha256').update(token).digest('hex');
       await pool.query(`UPDATE auth_tokens SET consumed_at=now() WHERE user_id=$1 AND purpose='password_reset' AND consumed_at IS NULL`, [user.rows[0].id]);
       await pool.query(`INSERT INTO auth_tokens(user_id,purpose,token_hash,expires_at) VALUES($1,'password_reset',$2,now()+interval '1 hour')`, [user.rows[0].id, hash]);
-      await pool.query(`INSERT INTO outbox_messages(event_key,recipient,subject,body) VALUES($1,$2,$3,$4)`, [`reset:${user.rows[0].id}:${hash}`, form.email, 'Reset your Seedexchange password', `Reset your password: ${process.env.APP_URL ?? 'https://seedexchange.online'}/reset-password?token=${token}`]);
+      await pool.query(`INSERT INTO outbox_messages(event_key,recipient,subject,body) VALUES($1,$2,$3,$4)`, [`reset:${user.rows[0].id}:${hash}`, form.email, 'Reset your Seedexchange password', `Reset your password: ${buildAuthActionUrl(config.APP_URL, 'password_reset', token)}`]);
     }
     return reply.view('pages/message.ejs', pageModel(request, { title: 'Check your email', description: 'Password reset requested.', canonical: null, message: 'If that address belongs to an account, a reset link has been queued.' }));
   });

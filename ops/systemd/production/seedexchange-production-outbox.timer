@@ -1,0 +1,13 @@
+[Unit]
+Description=Deliver Seedexchange production discovery outbox every minute
+
+[Timer]
+Unit=seedexchange-production-outbox.service
+OnBootSec=2min
+OnUnitActiveSec=1min
+RandomizedDelaySec=10s
+AccuracySec=1s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

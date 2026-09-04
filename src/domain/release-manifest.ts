@@ -46,7 +46,7 @@ function parseManifest(input: unknown): DiscoveryReleaseManifest {
 export const discoveryReleaseManifestSchema = { parse: parseManifest } as const;
 
 const allowedExactFiles = new Set(['.nvmrc', 'package.json', 'package-lock.json']);
-const allowedPrefixes = ['dist/', 'public/', 'src/templates/'];
+const allowedPrefixes = ['dist/', 'ops/systemd/production/', 'public/', 'src/templates/'];
 const requiredFiles = [
   '.nvmrc',
   'package.json',
@@ -56,6 +56,11 @@ const requiredFiles = [
   'dist/scripts/verify-release-manifest.js',
   'dist/scripts/verify-ready.js',
   'dist/scripts/verify-discovery-runtime.js',
+  'ops/systemd/production/seedexchange-production.service',
+  'ops/systemd/production/seedexchange-production-outbox.service',
+  'ops/systemd/production/seedexchange-production-outbox.timer',
+  'ops/systemd/production/seedexchange-production-sitemap.service',
+  'ops/systemd/production/seedexchange-production-sitemap.timer',
   'public/assets/app.css',
   'src/templates/layouts/base.ejs',
 ] as const;
@@ -69,8 +74,9 @@ function isAllowedReleaseFile(relative: string): boolean {
 }
 
 function isAllowedReleaseDirectory(relative: string): boolean {
-  return ['dist', 'public', 'src', 'src/templates'].includes(relative)
+  return ['dist', 'ops', 'ops/systemd', 'ops/systemd/production', 'public', 'src', 'src/templates'].includes(relative)
     || relative.startsWith('dist/')
+    || relative.startsWith('ops/systemd/production/')
     || relative.startsWith('public/')
     || relative.startsWith('src/templates/');
 }

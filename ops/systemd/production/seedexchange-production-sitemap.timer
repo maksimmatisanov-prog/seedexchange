@@ -1,0 +1,12 @@
+[Unit]
+Description=Generate Seedexchange production discovery sitemap hourly
+
+[Timer]
+Unit=seedexchange-production-sitemap.service
+OnBootSec=5min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
