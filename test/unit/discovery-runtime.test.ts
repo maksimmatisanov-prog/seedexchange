@@ -25,6 +25,8 @@ const headers = {
 };
 
 function response(path: string): Response {
+  if (path.startsWith('/directory/?slug=')) return new Response(null, { status: 301, headers: { ...headers, location: options.organizationPath } });
+  if (path.startsWith('/product/?slug=')) return new Response(null, { status: 301, headers: { ...headers, location: options.productPath } });
   const canonical = `<link rel="canonical" href="https://seedexchange.online${path}">`;
   if (path === '/health') return Response.json({ status: 'ok', launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }, { headers });
   if (path === '/ready') return Response.json({ status: 'ready', database: 'ok', migration: options.expectedMigration, launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }, { headers });
@@ -43,25 +45,27 @@ describe('discovery production runtime verification', () => {
     const requested: string[] = [];
     const report = await verifyDiscoveryRuntime(options, async (input, init) => {
       const url = new URL(input.toString());
-      requested.push(url.pathname);
+      requested.push(`${url.pathname}${url.search}`);
       expect(init?.method).toBe('GET');
       expect(new Headers(init?.headers).get('host')).toBe('seedexchange.online');
       expect(init?.redirect).toBe('manual');
-      return response(url.pathname);
+      return response(`${url.pathname}${url.search}`);
     });
     expect(report).toMatchObject({ ready: true, expectedMigration: options.expectedMigration, errors: [] });
-    expect(report.checks).toHaveLength(13);
+    expect(report.checks).toHaveLength(15);
     expect(requested).toContain(options.mediaPath);
   });
 
   it('rejects enabled commerce, stale migration and missing discovery evidence', async () => {
     const report = await verifyDiscoveryRuntime(options, async (input) => {
-      const path = new URL(input.toString()).pathname;
+      const url = new URL(input.toString());
+      const path = `${url.pathname}${url.search}`;
       if (path === '/health') return Response.json({ status: 'ok', launchPhase: 'commerce', commerceEnabled: true, connectEnabled: true, marketplacePaymentsEnabled: true, payoutWorkerEnabled: false }, { headers });
       if (path === '/ready') return Response.json({ status: 'ready', database: 'ok', migration: '002_legacy_compatibility.sql', launchPhase: 'commerce', commerceEnabled: true, connectEnabled: true, marketplacePaymentsEnabled: true, payoutWorkerEnabled: false }, { headers });
       if (path === '/marketplace') return new Response('<link rel="canonical" href="https://seedexchange.online/marketplace"><main></main>', { headers: { ...headers, 'content-type': 'text/html' } });
       if (path === options.productPath) return new Response(`<link rel="canonical" href="https://seedexchange.online${path}"><form action="/cart/add"></form>`, { headers: { ...headers, 'content-type': 'text/html' } });
       if (path === '/sitemap.xml') return new Response('<urlset></urlset>', { headers: { ...headers, 'content-type': 'application/xml' } });
+      if (path.startsWith('/product/?slug=')) return new Response(null, { status: 301, headers: { ...headers, location: '/product/wrong' } });
       return response(path);
     });
     expect(report.ready).toBe(false);
@@ -72,6 +76,7 @@ describe('discovery production runtime verification', () => {
       '/marketplace is missing the discovery payment notice.',
       `${options.productPath} did not expose an external-only purchase action.`,
       `/sitemap.xml is missing ${options.organizationPath}.`,
+      `/product/?slug=${options.productPath.slice('/product/'.length)} did not redirect to ${options.productPath}.`,
     ]));
   });
 
@@ -114,7 +119,7 @@ describe('discovery production runtime verification', () => {
         `--media=${options.mediaPath}`,
       ], { cwd: process.cwd(), encoding: 'utf8' });
       expect(JSON.parse(execution.stdout)).toMatchObject({ ready: true, errors: [] });
-      expect(receivedHosts).toHaveLength(13);
+      expect(receivedHosts).toHaveLength(15);
       expect(new Set(receivedHosts)).toEqual(new Set(['seedexchange.online']));
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

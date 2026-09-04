@@ -140,6 +140,8 @@ export async function verifyDiscoveryRuntime(
     '/sitemap.xml',
     '/assets/app.css',
     options.mediaPath,
+    `/directory/?slug=${options.organizationPath.slice('/directory/'.length)}`,
+    `/product/?slug=${options.productPath.slice('/product/'.length)}`,
     '/__seedexchange_discovery_runtime_probe__',
   ];
   const responses = new Map<string, RuntimeResponse>();
@@ -170,7 +172,7 @@ export async function verifyDiscoveryRuntime(
   }
 
   for (const [requestPath, response] of responses) {
-    const expectedStatus = requestPath === '/__seedexchange_discovery_runtime_probe__' ? 404 : 200;
+    const expectedStatus = requestPath.includes('?slug=') ? 301 : requestPath === '/__seedexchange_discovery_runtime_probe__' ? 404 : 200;
     if (response.status !== expectedStatus) errors.push(`${requestPath} returned HTTP ${String(response.status)}; expected ${expectedStatus}.`);
     if (response.status !== null) requireSecurityHeaders(response, errors);
   }
@@ -206,6 +208,12 @@ export async function verifyDiscoveryRuntime(
   }
   if (!responses.get(options.productPath)!.body.includes('View at source') || responses.get(options.productPath)!.body.includes('action="/cart/add"')) {
     errors.push(`${options.productPath} did not expose an external-only purchase action.`);
+  }
+  for (const [legacyPath, canonicalPath] of [
+    [`/directory/?slug=${options.organizationPath.slice('/directory/'.length)}`, options.organizationPath],
+    [`/product/?slug=${options.productPath.slice('/product/'.length)}`, options.productPath],
+  ]) {
+    if (responses.get(legacyPath)!.headers.get('location') !== canonicalPath) errors.push(`${legacyPath} did not redirect to ${canonicalPath}.`);
   }
 
   const robots = responses.get('/robots.txt')!;

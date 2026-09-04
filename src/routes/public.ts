@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import path from 'node:path';
 import { z } from 'zod';
 import { config } from '../config.js';
@@ -8,6 +8,11 @@ import { pageModel } from '../lib/view.js';
 import { getOrganization, getProduct, homeModel, listExchanges, listOrganizations, listProducts } from '../services/catalog.js';
 
 const slugSchema = z.string().regex(/^[a-z0-9-]{1,190}$/);
+
+function legacyQuerySlug(query: unknown): string | null {
+  const parsed = z.object({ slug: slugSchema.optional() }).safeParse(query);
+  return parsed.success ? parsed.data.slug ?? null : null;
+}
 
 export async function registerPublicRoutes(app: FastifyInstance) {
   app.get<{ Params: { key: string } }>('/media/:key', async (request, reply) => {
@@ -48,11 +53,16 @@ export async function registerPublicRoutes(app: FastifyInstance) {
     return reply.view('pages/home.ejs', pageModel(request, { ...content.home, canonical: '/', ...model }));
   });
 
-  app.get('/directory', async (request, reply) => {
+  const directoryIndex = async (request: FastifyRequest, reply: FastifyReply) => {
+    const legacySlug = legacyQuerySlug(request.query);
+    if (legacySlug) return reply.redirect(`/directory/${legacySlug}`, 301);
+    if (new URL(request.url, 'http://localhost').pathname === '/directory/') return reply.redirect('/directory', 301);
     let organizations: Awaited<ReturnType<typeof listOrganizations>> = [];
     try { organizations = await listOrganizations(); } catch (error) { request.log.debug({ err: error }, 'Directory unavailable'); }
     return reply.view('pages/catalog/directory.ejs', pageModel(request, { ...content.directory, canonical: '/directory', organizations }));
-  });
+  };
+  app.get('/directory', directoryIndex);
+  app.get('/directory/', directoryIndex);
   app.get<{ Params: { slug: string } }>('/directory/:slug', async (request, reply) => {
     const organization = await getOrganization(slugSchema.parse(request.params.slug));
     if (!organization) return reply.code(404).view('pages/not-found.ejs', pageModel(request, { title: 'Organization not found', description: 'This organization is not available.', canonical: null }));
@@ -70,6 +80,13 @@ export async function registerPublicRoutes(app: FastifyInstance) {
     const products = query.q ? await listProducts({ q: query.q }) : [];
     return reply.view('pages/catalog/search.ejs', pageModel(request, { title: 'Search', description: 'Search documented seeds and accessions.', canonical: query.q ? null : '/search', products, q: query.q }));
   });
+  const legacyProduct = async (request: FastifyRequest, reply: FastifyReply) => {
+    const legacySlug = legacyQuerySlug(request.query);
+    if (legacySlug) return reply.redirect(`/product/${legacySlug}`, 301);
+    return reply.code(404).view('pages/not-found.ejs', pageModel(request, { title: 'Product not found', description: 'This product is not available.', canonical: null }));
+  };
+  app.get('/product', legacyProduct);
+  app.get('/product/', legacyProduct);
   app.get<{ Params: { slug: string } }>('/product/:slug', async (request, reply) => {
     const product = await getProduct(slugSchema.parse(request.params.slug));
     if (!product) return reply.code(404).view('pages/not-found.ejs', pageModel(request, { title: 'Product not found', description: 'This product is not available.', canonical: null }));

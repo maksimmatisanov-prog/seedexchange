@@ -103,5 +103,18 @@ describe('public application', () => {
     const response = await app.inject({ method: 'GET', url: '/?_route=/marketplace' });
     expect(response.statusCode).toBe(301);
     expect(response.headers.location).toBe('/marketplace');
+
+    for (const [url, location] of [
+      ['/directory?slug=northern-seed-library', '/directory/northern-seed-library'],
+      ['/directory/?slug=northern-seed-library', '/directory/northern-seed-library'],
+      ['/product?slug=arctic-pea', '/product/arctic-pea'],
+      ['/product/?slug=arctic-pea', '/product/arctic-pea'],
+    ]) {
+      const legacy = await app.inject({ method: 'GET', url });
+      expect(legacy.statusCode).toBe(301);
+      expect(legacy.headers.location).toBe(location);
+    }
+    expect((await app.inject({ method: 'GET', url: '/directory/' })).headers.location).toBe('/directory');
+    expect((await app.inject({ method: 'GET', url: '/product/?slug=../../cart' })).statusCode).toBe(404);
   });
 });

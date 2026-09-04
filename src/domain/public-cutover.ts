@@ -140,13 +140,15 @@ export async function verifyPublicCutover(options: PublicCutoverOptions, depende
     `${productionOrigin}/health`, `${productionOrigin}/ready`, `${productionOrigin}${options.organizationPath}`,
     `${productionOrigin}${options.productPath}`, `${productionOrigin}/sitemap.xml`, `${productionOrigin}${options.mediaPath}`,
     `${productionOrigin}/cart`, 'https://www.seedexchange.online/cutover-probe?source=www',
+    `${productionOrigin}/directory/?slug=${options.organizationPath.slice('/directory/'.length)}`,
+    `${productionOrigin}/product/?slug=${options.productPath.slice('/product/'.length)}`,
   ];
   const responses = new Map<string, PublicHttpResponse>();
   for (const value of urls) {
     try { responses.set(value, await requester(new URL(value))); }
     catch { errors.push(`HTTPS request failed for ${new URL(value).pathname}.`); }
   }
-  const expectedStatuses = new Map(urls.map((url) => [url, url.endsWith('/cart') ? 404 : url.startsWith('https://www.') ? 308 : 200]));
+  const expectedStatuses = new Map(urls.map((url) => [url, url.includes('?slug=') ? 301 : url.endsWith('/cart') ? 404 : url.startsWith('https://www.') ? 308 : 200]));
   for (const [url, response] of responses) {
     if (response.status !== expectedStatuses.get(url)) errors.push(`${new URL(url).pathname} returned HTTP ${String(response.status)} instead of ${String(expectedStatuses.get(url))}.`);
     if (!['TLSv1.2', 'TLSv1.3'].includes(response.tlsProtocol ?? '')) errors.push(`${new URL(url).pathname} did not negotiate TLS 1.2 or 1.3.`);
@@ -171,6 +173,12 @@ export async function verifyPublicCutover(options: PublicCutoverOptions, depende
   if (!media?.contentType?.includes('image/webp') || media.bytes < 1) errors.push(`${options.mediaPath} is not a non-empty WebP response.`);
   const www = responses.get('https://www.seedexchange.online/cutover-probe?source=www');
   if (www?.location !== `${productionOrigin}/cutover-probe?source=www`) errors.push('www did not redirect to the exact canonical URI.');
+  for (const [legacyUrl, canonicalPath] of [
+    [`${productionOrigin}/directory/?slug=${options.organizationPath.slice('/directory/'.length)}`, options.organizationPath],
+    [`${productionOrigin}/product/?slug=${options.productPath.slice('/product/'.length)}`, options.productPath],
+  ]) {
+    if (responses.get(legacyUrl)?.location !== canonicalPath) errors.push(`${new URL(legacyUrl).pathname}?slug did not redirect to ${canonicalPath}.`);
+  }
   for (const response of responses.values()) {
     if (response.headers['x-content-type-options'] !== 'nosniff') errors.push(`${new URL(response.url).pathname} is missing X-Content-Type-Options.`);
     if (!response.headers['strict-transport-security']?.includes('max-age=')) errors.push(`${new URL(response.url).pathname} is missing HSTS.`);

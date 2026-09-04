@@ -9,6 +9,8 @@ const security = { 'x-content-type-options': 'nosniff', 'strict-transport-securi
 
 function response(url: URL) {
   const base = { url: url.toString(), status: 200, contentType: 'text/html', bytes: 10, durationMs: 12, tlsProtocol: 'TLSv1.3', location: null, headers: security, body: '' };
+  if (url.pathname === '/directory/' && url.searchParams.has('slug')) return { ...base, status: 301, location: options.organizationPath };
+  if (url.pathname === '/product/' && url.searchParams.has('slug')) return { ...base, status: 301, location: options.productPath };
   if (url.pathname === '/health') return { ...base, contentType: 'application/json', body: JSON.stringify({ status: 'ok', launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }) };
   if (url.pathname === '/ready') return { ...base, contentType: 'application/json', body: JSON.stringify({ status: 'ready', database: 'ok', migration: options.expectedMigration, launchPhase: 'discovery', commerceEnabled: false, connectEnabled: false, marketplacePaymentsEnabled: false, payoutWorkerEnabled: false }) };
   if (url.pathname === options.organizationPath) return { ...base, body: `<link rel="canonical" href="https://seedexchange.online${options.organizationPath}">` };
@@ -37,7 +39,7 @@ describe('public discovery cutover evidence', () => {
     });
     expect(report).toMatchObject({ ready: true, errors: [] });
     expect(report.dns).toHaveLength(4);
-    expect(report.http).toHaveLength(8);
+    expect(report.http).toHaveLength(10);
     expect(report.http.every((item) => !('body' in item) && !('headers' in item))).toBe(true);
   });
 
@@ -47,7 +49,9 @@ describe('public discovery cutover evidence', () => {
       request: async (url) => {
         const current = response(url);
         if (url.pathname === '/health') current.body = JSON.stringify({ status: 'ok', launchPhase: 'commerce', commerceEnabled: true, connectEnabled: true, marketplacePaymentsEnabled: true, payoutWorkerEnabled: true });
-        return { ...current, tlsProtocol: 'TLSv1.1', location: url.hostname === 'www.seedexchange.online' ? 'https://wrong.example/' : current.location };
+        return { ...current, tlsProtocol: 'TLSv1.1', location: url.hostname === 'www.seedexchange.online'
+          ? 'https://wrong.example/'
+          : url.pathname === '/product/' && url.searchParams.has('slug') ? '/product/wrong' : current.location };
       },
     });
     expect(report.ready).toBe(false);
@@ -56,6 +60,7 @@ describe('public discovery cutover evidence', () => {
       'google returned an unexpected IPv6 result for seedexchange.online.',
       '/health did not confirm the discovery-only boundary.',
       'www did not redirect to the exact canonical URI.',
+      `/product/?slug did not redirect to ${options.productPath}.`,
     ]));
     expect(report.errors.some((error) => error.includes('TLS 1.2 or 1.3'))).toBe(true);
   });
