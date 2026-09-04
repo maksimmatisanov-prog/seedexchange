@@ -60,8 +60,8 @@ This is not approved for production cutover. `MIGRATION.md` is the source of tru
 
 As of 2026-09-04:
 
-- The working branch is `codex/discovery-launch` and has not been pushed. The latest application change is `4676b5c`; later local commits update operational evidence and gates only.
-- Local TypeScript, the clean build and 109 Vitest checks pass. One PostgreSQL-backed migration test is skipped when `TEST_DATABASE_URL` is not configured. Chromium public acceptance most recently passed 13 checks with two deliberate duplicate-viewport skips.
+- The working branch `codex/discovery-launch` is pushed to `origin`. Its first GitHub verification run passed install, TypeScript, Vitest, build and the production dependency audit, then exposed a missing isolated media-root contract in the mutating Playwright step. The workflow now supplies matching run-specific media roots under the runner temporary directory; the follow-up CI run remains the remote acceptance gate.
+- Local TypeScript, the clean build and 111 Vitest checks pass. One PostgreSQL-backed migration test is skipped when `TEST_DATABASE_URL` is not configured. A complete CI-equivalent mutating Chromium run against isolated PostgreSQL 14 passed 17 checks with 22 deliberate skips; the temporary database and media directories were removed afterwards.
 - The immutable discovery release manifest verifies 310 allowlisted files, pins migration `003_discovery_migration_scope.sql` and contains no runtime `node_modules`.
 - Read-only public checks still identify the Hostinger PHP application. DNS still resolves through the existing Hostinger/CDN addresses, not the intended VPS cutover address.
 - The repository includes a read-only host preflight for the clean, foundation and units-installed stages. Its current VPS `--expect=clean` run returned `ready=true`, confirming Node 24, the `seedexchange` service account, active PostgreSQL and Caddy, the existing isolated staging root `/srv/seedexchange`, a valid Caddy site import and a free production loopback port `4200`.
