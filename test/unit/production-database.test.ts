@@ -48,7 +48,7 @@ describe('production database identity', () => {
       timeout: 10_000,
       env: {
         ...process.env,
-        NODE_ENV: 'production',
+        NODE_ENV: 'test',
         SESSION_SECRET: 'a-secure-random-session-value-1234567890',
         DATABASE_URL: databaseUrl,
         DB_POOL_MAX: '1',

@@ -30,7 +30,7 @@ function isLocalProductionDatabase(value: string): boolean {
   }
 }
 
-export function validateDiscoveryProductionEnvironment(environment: Readonly<Record<string, string>>): string[] {
+export function validateDiscoveryProductionEnvironment(environment: Readonly<Record<string, string | undefined>>): string[] {
   const errors: string[] = [];
   for (const [name, expected] of Object.entries(requiredExactValues)) {
     if (environment[name] !== expected) errors.push(`${name} must match the phase-1 production contract.`);

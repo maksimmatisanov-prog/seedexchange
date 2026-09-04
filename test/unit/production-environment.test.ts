@@ -41,7 +41,7 @@ describe('phase-1 production environment contract', () => {
       DATABASE_URL: 'postgresql://postgres@127.0.0.1/seedexchange_staging',
       LAUNCH_PHASE: 'commerce',
       MARKETPLACE_PAYMENTS_ENABLED: '1',
-      STRIPE_SECRET_KEY: 'sk_live_private',
+      STRIPE_SECRET_KEY: 'test-only-nonempty-stripe-secret',
       LEGACY_MYSQL_URL: 'mysql://private-source',
     });
     expect(errors).toEqual(expect.arrayContaining([
@@ -96,5 +96,29 @@ describe('phase-1 production environment contract', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('enforces the same discovery contract when the production runtime loads', () => {
+    const command = [
+      path.resolve('node_modules/tsx/dist/cli.mjs'),
+      '--eval',
+      "import('./src/config.ts')",
+    ];
+    const accepted = spawnSync(process.execPath, command, {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: { ...process.env, ...valid },
+    });
+    expect(accepted.status, accepted.stderr).toBe(0);
+
+    const forbiddenStripeSecret = 'test-only-runtime-stripe-secret';
+    const rejected = spawnSync(process.execPath, command, {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: { ...process.env, ...valid, STRIPE_SECRET_KEY: forbiddenStripeSecret },
+    });
+    expect(rejected.status).not.toBe(0);
+    expect(rejected.stderr).toContain('Stripe secrets must be absent during the discovery launch.');
+    expect(rejected.stderr).not.toContain(forbiddenStripeSecret);
   });
 });

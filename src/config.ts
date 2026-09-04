@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import { commerceEnabled, publicProductModes, validateLaunchFlags } from './domain/launch.js';
+import { validateDiscoveryProductionEnvironment } from './domain/production-environment.js';
 
 dotenv.config();
 
@@ -54,6 +55,12 @@ const launchErrors = validateLaunchFlags({
 if (launchErrors.length) throw new Error(`Invalid launch configuration: ${launchErrors.join(' ')}`);
 
 if (parsed.data.NODE_ENV === 'production') {
+  if (parsed.data.LAUNCH_PHASE === 'discovery') {
+    const discoveryEnvironmentErrors = validateDiscoveryProductionEnvironment(process.env);
+    if (discoveryEnvironmentErrors.length) {
+      throw new Error(`Invalid discovery production environment: ${discoveryEnvironmentErrors.join(' ')}`);
+    }
+  }
   if (parsed.data.SESSION_SECRET.length < 32 || parsed.data.SESSION_SECRET.includes('development')) {
     throw new Error('SESSION_SECRET must contain at least 32 non-default characters in production.');
   }
