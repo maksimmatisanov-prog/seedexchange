@@ -24,6 +24,7 @@
     "verify-ready": "node dist/scripts/verify-ready.js",
     "verify:discovery-data": "node dist/scripts/verify-discovery-data.js",
     "verify:media": "node dist/scripts/verify-media.js",
+    "backfill:media-sha": "node dist/scripts/backfill-media-sha.js",
     "sync:oreshka": "node dist/scripts/sync-oreshka.js",
     "prepare:supplier-batch": "node dist/scripts/prepare-supplier-batch.js",
     "migrate-legacy": "node dist/scripts/migrate-legacy.js"

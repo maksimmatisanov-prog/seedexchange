@@ -29,9 +29,10 @@ npm run migrate-legacy -- --dry-run --scope=discovery
 npm run sync:oreshka -- --feed=<https-url-or-local-fixture>
 npm run prepare:supplier-batch -- --limit=200
 npm run verify:media
+npm run backfill:media-sha
 ```
 
-`migrate-legacy` defaults to the discovery scope. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. The full scope contains commerce history and must not be used for the discovery launch.
+`migrate-legacy` defaults to the discovery scope. Only `--import` writes migrated rows, supplier commands write only with `--commit`, and batch publication still requires platform-administrator approval. `backfill:media-sha` is read-only by default and writes only with `-- --commit`, after all non-SHA media metadata has matched. The full scope contains commerce history and must not be used for the discovery launch.
 
 ## Repository map
 

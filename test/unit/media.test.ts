@@ -70,7 +70,8 @@ describe('media inventory verification', () => {
       `Media file has no database row: ${orphan}.`,
       `Media byte size mismatch: ${key}.`,
       `Media dimensions mismatch: ${key}.`,
-      `Media database SHA-256 is missing or invalid: ${key}.`,
+      `Media database SHA-256 is missing: ${key}.`,
     ]));
+    expect(report.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining(['orphan_file','byte_size_mismatch','dimensions_mismatch','database_sha_missing']));
   });
 });

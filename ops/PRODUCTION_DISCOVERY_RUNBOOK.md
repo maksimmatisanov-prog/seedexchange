@@ -53,11 +53,18 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    ```bash
    npm run migrate-legacy -- --import --scope=discovery
    npm run generate-sitemap
+   npm run backfill:media-sha
+   ```
+
+4. Review the dry-run SHA candidates. Any path, format, size, dimension, orphan or existing-hash mismatch blocks the run. After a separate explicit media-metadata approval, run:
+
+   ```bash
+   npm run backfill:media-sha -- --commit
    npm run verify:media
    npm run verify:discovery-data -- 003_discovery_migration_scope.sql
    ```
 
-4. Both verifiers must report `ready: true`. Any media path/hash/metadata mismatch or orphan file, commerce row, payment capability, non-HTTPS product, pending moderation, failed sitemap state, missing administrator or schema mismatch blocks activation.
+5. Both verifiers must report `ready: true`. Any media path/hash/metadata mismatch or orphan file, commerce row, payment capability, non-HTTPS product, pending moderation, failed sitemap state, missing administrator or schema mismatch blocks activation.
 
 ## 5. Private runtime acceptance
 
