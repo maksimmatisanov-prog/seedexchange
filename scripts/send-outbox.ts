@@ -1,11 +1,10 @@
-import nodemailer from 'nodemailer';
 import { config } from '../src/config.js';
 import { pool } from '../src/db/pool.js';
+import { createConfiguredMailTransport } from '../src/services/mail-transport.js';
 
 type OutboxMessage = { id: string; recipient: string; subject: string; body: string; attempts: number };
 
-if (!config.MAIL_HOST || !config.MAIL_USER || !config.MAIL_PASS || !config.MAIL_FROM) throw new Error('SMTP configuration is incomplete.');
-const transport = nodemailer.createTransport({ host: config.MAIL_HOST, port: config.MAIL_PORT, secure: config.MAIL_ENCRYPTION === 'ssl', auth: { user: config.MAIL_USER, pass: config.MAIL_PASS }, requireTLS: config.MAIL_ENCRYPTION === 'tls' });
+const transport = createConfiguredMailTransport();
 let sent = 0; let failed = 0;
 for (let index = 0; index < 25; index++) {
   const client = await pool.connect();
@@ -28,4 +27,4 @@ for (let index = 0; index < 25; index++) {
     await pool.query(`UPDATE outbox_messages SET status='failed',locked_at=NULL,last_error=$2,next_attempt_at=now()+$3::interval WHERE id=$1`, [message.id, String(error).slice(0,500), delay]); failed++;
   }
 }
-console.log(JSON.stringify({ sent, failed })); await pool.end();
+console.log(JSON.stringify({ sent, failed })); transport.close(); await pool.end();

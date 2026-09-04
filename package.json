@@ -25,6 +25,7 @@
     "verify:discovery-data": "node dist/scripts/verify-discovery-data.js",
     "verify:discovery-rehearsal": "node dist/scripts/verify-discovery-rehearsal.js",
     "verify:production-env": "node dist/scripts/verify-production-environment.js",
+    "verify:production-mail": "node dist/scripts/verify-production-mail.js",
     "verify:production-observation": "node dist/scripts/verify-production-observation.js",
     "verify:discovery-load": "node dist/scripts/verify-discovery-load.js",
     "verify:discovery-runtime": "node dist/scripts/verify-discovery-runtime.js",

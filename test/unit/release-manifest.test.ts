@@ -18,6 +18,7 @@ async function createReleaseRoot(): Promise<string> {
     'dist/src/db/migrations/003_discovery_migration_scope.sql': 'SELECT 1;',
     'dist/scripts/verify-discovery-load.js': 'export {};',
     'dist/scripts/verify-production-environment.js': 'export {};',
+    'dist/scripts/verify-production-mail.js': 'export {};',
     'dist/scripts/verify-production-observation.js': 'export {};',
     'dist/scripts/verify-release-manifest.js': 'export {};',
     'dist/scripts/verify-ready.js': 'export {};',

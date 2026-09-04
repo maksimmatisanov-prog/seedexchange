@@ -70,6 +70,7 @@ cd "$release"
 sudo -u seedexchange -- npm ci --omit=dev
 ln -s "$env_file" .env
 sudo -u seedexchange -- node dist/scripts/verify-production-environment.js --file="$env_file"
+sudo -u seedexchange -- node dist/scripts/verify-production-mail.js
 sudo -u seedexchange -- node dist/src/db/migrate.js
 chmod -R a-w "$release"
 prepared=1

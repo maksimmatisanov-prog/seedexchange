@@ -61,6 +61,7 @@ const requiredFiles = [
   'dist/src/server.js',
   'dist/scripts/verify-discovery-load.js',
   'dist/scripts/verify-production-environment.js',
+  'dist/scripts/verify-production-mail.js',
   'dist/scripts/verify-production-observation.js',
   'dist/scripts/verify-release-manifest.js',
   'dist/scripts/verify-ready.js',

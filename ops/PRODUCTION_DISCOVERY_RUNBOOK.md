@@ -61,7 +61,7 @@ This runbook covers only phase 1: directory, organizations, exchange and HTTPS e
    SEEDX_PRODUCTION_DISCOVERY_PREPARE_APPROVED=YES bash ops/deploy-production-discovery.sh /secure/seedexchange-<commit>.tar.gz <sha256> <40-char-commit>
    ```
 
-   The script rejects unsafe archive paths and file types, verifies the outer SHA-256 and internal file manifest before `npm ci`, validates the private production environment, applies only ordered PostgreSQL schema migrations and leaves the release read-only. It does not switch `current`, start the service, import data, or change Caddy/DNS.
+   The script rejects unsafe archive paths and file types, verifies the outer SHA-256 and internal file manifest before `npm ci`, validates the private production environment and performs an SMTP connection/authentication preflight without sending a message. Only then does it apply ordered PostgreSQL schema migrations and leave the release read-only. A failed or timed-out SMTP preflight blocks preparation and emits only a safe failure code, never the host, user, password or sender address. The script does not switch `current`, start the service, import data, or change Caddy/DNS.
 5. From the restored legacy uploads, generate a source manifest with `npm run manifest:media -- --root=/absolute/restored/uploads --output=/secure/source-media-manifest.json`; record the manifest file's own SHA-256 with the backup evidence. Then copy required first-party media into `shared/storage/media`. External Oreshka images remain HTTPS URLs and are not copied.
 
 ## 4. Rehearse and import discovery data
