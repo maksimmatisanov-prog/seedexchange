@@ -45,4 +45,22 @@ describe('production discovery systemd bundle', () => {
     expect(sitemap).toContain('Unit=seedexchange-production-sitemap.service');
     expect(sitemap).toContain('OnUnitActiveSec=1h');
   });
+
+  it('restarts the previous application process during a failed activation rollback', async () => {
+    const activation = await readFile(path.resolve('ops/activate-production-discovery.sh'), 'utf8');
+    const rollbackStart = activation.indexOf('if [[ -n "$previous"');
+    const firstDeploymentFallback = activation.indexOf('  else\n', rollbackStart);
+    expect(rollbackStart).toBeGreaterThan(-1);
+    expect(firstDeploymentFallback).toBeGreaterThan(rollbackStart);
+    const rollback = activation.slice(rollbackStart, firstDeploymentFallback);
+    const disableTimers = rollback.indexOf('sudo systemctl disable --now seedexchange-production-sitemap.timer seedexchange-production-outbox.timer');
+    const switchSymlink = rollback.indexOf('mv -Tf "$root/current.next" "$root/current"');
+    const restartPrevious = rollback.indexOf('sudo systemctl restart "$service"');
+    const enableTimers = rollback.indexOf('sudo systemctl enable --now seedexchange-production-sitemap.timer seedexchange-production-outbox.timer');
+    expect(disableTimers).toBeGreaterThan(-1);
+    expect(switchSymlink).toBeGreaterThan(disableTimers);
+    expect(restartPrevious).toBeGreaterThan(switchSymlink);
+    expect(enableTimers).toBeGreaterThan(restartPrevious);
+    expect(rollback).not.toContain('enable --now "$service"');
+  });
 });
